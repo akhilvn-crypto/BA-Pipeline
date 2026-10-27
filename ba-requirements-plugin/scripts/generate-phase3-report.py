@@ -270,9 +270,7 @@ def render_traceability(model, doc_ids):
 
 CSS = """
 :root{--bg:#f5f6f8;--card:#fff;--ink:#1d2430;--muted:#566174;--line:#d6dbe3;--accent:#2b5fd9;--warn:#9a4b00;
---critical:#b3261e;--high:#b4530a;--medium:#7a6000;--low:#26694a;--open:#2b5fd9;--resolved:#26694a;--skipped:#6b5b95}
-@media (prefers-color-scheme:dark){:root{--bg:#14171c;--card:#1d222a;--ink:#e6e9ee;--muted:#a3adbd;--line:#333b47;--accent:#7ea2ff;--warn:#ffb067;
---critical:#d0524a;--high:#d1792f;--medium:#a88a1a;--low:#3f9a73;--open:#5b86ec;--resolved:#3f9a73;--skipped:#8f7fbf}}
+--critical:#b3261e;--high:#b4530a;--medium:#7a6000;--low:#26694a;--open:#2b5fd9;--resolved:#26694a;--skipped:#6b5b95;color-scheme:light}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,"Segoe UI",Roboto,Arial,sans-serif}
 a{color:var(--accent)}a:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
