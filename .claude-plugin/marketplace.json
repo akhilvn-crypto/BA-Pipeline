@@ -1,0 +1,14 @@
+{
+  "name": "ba-plugin-marketplace",
+  "owner": {
+    "name": "akhilvn-crypto"
+  },
+  "description": "Marketplace for the BA plugins.",
+  "plugins": [
+    {
+      "name": "ba-requirements",
+      "description": "BA requirements analysis: decompose Markdown requirements into validated atomic requirements (Phase 1), identify, prioritise and triage requirement gaps with a JSON register and HTML dashboard (Phase 2), then generate and enrich development stories in the requirements document with a consolidated HTML report (Phase 3).",
+      "source": "./ba-requirements-plugin"
+    }
+  ]
+}
