@@ -1,10 +1,65 @@
 # ba-requirements
 
-A standalone Claude Code plugin for BA requirements analysis.
+A Claude Code plugin that turns Markdown business requirements into validated atomic requirements, a triaged gap register and development stories with acceptance criteria, plus an offline HTML report.
+
+## Quick start
+
+**1. Install** (requires Claude Code and Python 3; no packages are installed):
+
+```text
+/plugin marketplace add akhilvn-crypto/BA-Pipeline
+/plugin install ba-requirements@ba-plugin-marketplace
+```
+
+**2. Open Claude Code in your project folder** (the one that holds, or will hold, your requirements `.md` files). All output is written under this folder, never into the plugin.
+
+**3. Run the pipeline:**
+
+```text
+/ba-requirements:run
+```
+
+It guides you through the whole flow and asks before it overwrites anything:
+
+| Step | What happens | What you do |
+|---|---|---|
+| 1. Source | Finds existing artifacts, asks where the requirements are. | Give a file, folder or path; confirm the match. |
+| 2. Phase 1: atomic requirements | Splits the requirements into atomic, traceable `REQ-xxx` items, validated and saved. | Nothing. |
+| 3. Phase 2: gap analysis | Finds missing, ambiguous or conflicting information, prioritises it (Critical to Low) and builds the gap register and dashboard. | Nothing. |
+| 4. Phase 2: triage | Shows gaps one at a time, Critical first. | Give a decision, skip the gap, skip all, or stop (progress is saved). |
+| 5. Phase 3: stories | Appends a `# Development Stories` section to your requirements document, then enriches only the stories your decisions affect. | Pick the target document if there are several; confirm the preview. |
+| 6. Report | Writes `report/phase3-report.html` and prints a summary with real counts. | Open the report in a browser. |
+
+**Resume or re-run at any time.** Run `/ba-requirements:run` again: existing work is detected and reused, stories keep their IDs, and answered gaps stay answered. Edit your requirements, or settle skipped gaps later, and re-run to reconcile.
+
+Prefer to go step by step? Every phase is also a standalone command, see below.
+
+### Typical workflows
+
+| I want to... | Run |
+|---|---|
+| Do everything in one go | `/ba-requirements:run` |
+| Only break requirements down | `/ba-requirements:start-analysis` |
+| Find and review gaps | `/ba-requirements:analyse-gaps`, then `/ba-requirements:triage-gaps` |
+| Settle skipped gaps later and update the stories | `/ba-requirements:triage-gaps`, then `/ba-requirements:enrich-stories` |
+| Accept my manual edits to the stories | `/ba-requirements:sync-stories` |
+| Refresh the HTML report only | `/ba-requirements:generate-report` |
+
+### What you get
+
+```text
+<your-project>/
+├── <your requirements>.md      original content untouched; '# Development Stories' appended (the only part written)
+├── atomic_requirements/        atomic_requirements.json
+├── gaps/                       gaps.json (register), gap-analysis.html (dashboard)
+├── stories/                    story-generation-state.json, backups/
+└── report/                     phase3-report.html (offline, read-only)
+```
+
+## Overview
 
 - **Phase 1** reads Markdown requirement documents, decomposes them into atomic requirements, validates the result and saves it as JSON in your project.
 - **Phase 2** analyses those atomic requirements for gaps, prioritises them, keeps a JSON gap register and an HTML dashboard, and guides you through triaging the gaps one at a time.
-
 - **Phase 3** writes development stories into a `# Development Stories` section at the end of your original Markdown requirements document, enriches only the affected stories when gaps are resolved, detects and reconciles manual edits, and keeps a consolidated HTML report of stories, gaps and business decisions.
 
 Out of scope: Jira integration, story approval workflows, test cases, writing gap decisions back into the atomic requirements, and any change to your documents outside the `Development Stories` section or to `atomic_requirements.json`.
@@ -222,19 +277,15 @@ Self-contained (no server, CDN or database). Sections: project overview (timesta
 
 ## Install and test locally
 
-Requires Claude Code and Python 3 (standard library only; nothing is installed).
+Requires Claude Code and Python 3 (standard library only; nothing is installed). To install from the marketplace, see [Quick start](#quick-start).
+
+To test the plugin from a local checkout:
 
 ```text
 claude --plugin-dir ./ba-requirements-plugin
 ```
 
 Then run the commands from your project directory. Use `/reload-plugins` after editing the plugin.
-
-To install through a marketplace, see the `ba-plugin-marketplace` repository, then:
-
-```text
-/plugin install ba-requirements@ba-plugin-marketplace
-```
 
 ## Scripts
 
