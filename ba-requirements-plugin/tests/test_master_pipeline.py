@@ -9,8 +9,10 @@ depends on the model and cannot be unit-tested. What is tested here:
 * the command file is well formed and refers only to files, scripts and commands that exist,
   and the phase commands remain independent of it;
 * the script sequence the command orchestrates behaves as the specification requires, driven
-  through the real command-line interfaces: full run, all gaps skipped, partly resolved gaps,
-  an interrupted and resumed triage, and a phase that fails its validation gate.
+  through the real command-line interfaces: full run, all gaps skipped, unresolved Critical/High
+  gaps, Critical/High resolved with Medium/Low left open or skipped, an interrupted and resumed
+  triage, and a phase that fails its validation gate. The story-generation gate is evaluated
+  exactly as the command specifies it (``PipelineCase.blockers``).
 """
 
 import json
@@ -80,7 +82,11 @@ class CommandFileTests(unittest.TestCase):
 
     def test_required_rules_are_stated(self):
         for phrase in (
-            "Open and skipped gaps do not block story generation",
+            "every Critical and High priority gap has status `resolved`",
+            "Medium and Low gaps never affect the gate",
+            "Nothing the user selects can bypass the gate",
+            "Resolve the blocking gaps now",
+            "Exit and resume later",
             "exactly four fields",
             "skip all remaining gaps",
             "STALE",
@@ -90,6 +96,24 @@ class CommandFileTests(unittest.TestCase):
             "illustrative or estimated",
         ):
             self.assertIn(phrase, self.text)
+
+    def test_gate_is_evaluated_from_the_store_and_runs_before_any_story_write(self):
+        gate = self.text.index("The story-generation gate (mandatory)")
+        self.assertIn("gap-register-store.py list", self.text[gate:self.text.index("## Step 1")])
+        step6 = self.text[self.text.index("## Step 6"):self.text.index("## Step 7")]
+        self.assertIn("Precondition: the story-generation gate must have passed", step6)
+        self.assertLess(step6.index("Precondition"), step6.index("Follow `generate-stories.md`"))
+
+    def test_skip_paths_return_to_the_gate_not_to_phase_3(self):
+        step5 = self.text[self.text.index("## Step 5"):self.text.index("## Step 6")]
+        self.assertIn("it does **not** continue to Phase 3", step5)
+        self.assertNotIn("continues to Phase 3", step5)
+        for phrase in ("5b — Story-generation gate", "5c — Blocker triage pass", "Repeat 5b–5c until the gate passes or the user exits"):
+            self.assertIn(phrase, step5)
+
+    def test_it_no_longer_claims_open_or_skipped_gaps_never_block(self):
+        self.assertNotIn("Open and skipped gaps do not block story generation", self.text)
+        self.assertNotIn("they never block Phase 3", self.text)
 
     def test_no_invented_example_counts(self):
         for line in self.text.splitlines():
@@ -168,6 +192,25 @@ class PipelineCase(unittest.TestCase):
         code, result = self.gaps("resolve", "--gap-id", gap_id, "--decision-file", path)
         self.assertEqual(code, 0, result)
 
+    def blockers(self):
+        """The story-generation gate, exactly as run.md defines it: Critical/High gaps in the queue.
+
+        Returns the list of blocking gap IDs ([] = gate passes), or None when `list` fails and the
+        gate therefore cannot be verified (which also stops the pipeline).
+        """
+        code, listing = self.gaps("list")
+        if code != 0:
+            return None
+        return [g["gap_id"] for g in listing["queue"] if g["priority"] in ("Critical", "High")]
+
+    def four_level_gaps(self):
+        self.save_gaps([
+            make_gap("GAP-001", "Critical", "Should the account lock after failed logins?", ["REQ-001", "REQ-003"]),
+            make_gap("GAP-002", "High", "How long is a reset link valid?", ["REQ-002"]),
+            make_gap("GAP-003", "Medium", "Which events must the audit log record?", ["REQ-004"]),
+            make_gap("GAP-004", "Low", "Which formats can reports be exported in?", ["REQ-005"]),
+        ])
+
     def counts(self):
         code, result = self.gaps("summary")
         self.assertEqual(code, 0, result)
@@ -210,6 +253,7 @@ class FullRunTests(PipelineCase):
         self.assertEqual(self.counts(), {"open": 0, "skipped": 0, "resolved": 3})
         code, listing = self.gaps("list")
         self.assertEqual(listing["eligible_count"], 0)
+        self.assertEqual(self.blockers(), [])
         # Phase 3: generate, enrich, report
         result = self.generate_stories()
         self.assertEqual(len(result["created"]), 6)
@@ -232,56 +276,134 @@ class FullRunTests(PipelineCase):
 
 
 class SkipAllTests(PipelineCase):
-    def test_all_gaps_skipped_still_produces_stories_and_a_report(self):
+    def test_all_gaps_skipped_blocks_story_generation(self):
         self.default_gaps()
         for gap_id in ("GAP-001", "GAP-002", "GAP-003"):
             code, result = self.gaps("skip", "--gap-id", gap_id)
             self.assertEqual(code, 0, result)
         self.assertEqual(self.counts(), {"open": 0, "skipped": 3, "resolved": 0})
+        # Critical and High are unresolved, so the master command may not start Phase 3.
+        self.assertEqual(self.blockers(), ["GAP-001", "GAP-002"])
+        self.assertFalse(os.path.exists(os.path.join(self.root, "stories")))
+        self.assertFalse(os.path.exists(self.report))
+
+    def test_skip_all_remaining_does_not_bypass_the_gate(self):
+        self.default_gaps()
+        self.decide("GAP-001", "Lock the account after five failed attempts for 30 minutes.")
+        # "Skip all remaining" makes no store call: GAP-002 (High) and GAP-003 stay open.
+        self.assertEqual(self.counts(), {"open": 2, "skipped": 0, "resolved": 1})
+        self.assertEqual(self.blockers(), ["GAP-002"])
+        # Skipping the blocker individually changes its status but not the gate.
+        code, result = self.gaps("skip", "--gap-id", "GAP-002")
+        self.assertEqual(code, 0, result)
+        self.assertEqual(self.blockers(), ["GAP-002"])
+        self.assertFalse(os.path.exists(os.path.join(self.root, "stories")))
+
+    def test_skipping_never_records_a_decision(self):
+        self.default_gaps()
+        for gap_id in ("GAP-001", "GAP-002", "GAP-003"):
+            self.gaps("skip", "--gap-id", gap_id)
+        with open(self.register, encoding="utf-8") as handle:
+            self.assertTrue(all(g["decisions_recorded"] == [] for g in json.load(handle)))
+        self.assertEqual(self.counts(), {"open": 0, "skipped": 3, "resolved": 0})
+
+    def test_standalone_generate_stories_is_still_not_blocked_by_gaps(self):
+        # /ba-requirements:generate-stories is independent of the master gate and unchanged.
+        self.default_gaps()
+        for gap_id in ("GAP-001", "GAP-002", "GAP-003"):
+            self.gaps("skip", "--gap-id", gap_id)
         self.generate_stories()
-        code, info = self.stories("inspect")
-        self.assertEqual(info["pending_decisions"], [])
         code, result = self.stories("regenerate-report")
         self.assertEqual(code, 0, result)
-        # Skipped gaps stay unresolved, appear in the queue again and in the report, and invent no decision.
-        self.assertEqual(self.counts(), {"open": 0, "skipped": 3, "resolved": 0})
-        code, listing = self.gaps("list")
-        self.assertEqual(listing["eligible_count"], 3)
         page = read_text(self.report)
         for gap_id in ("GAP-001", "GAP-002", "GAP-003"):
             self.assertIn(gap_id, page)
-        with open(self.register, encoding="utf-8") as handle:
-            self.assertTrue(all(g["decisions_recorded"] == [] for g in json.load(handle)))
+        self.assertEqual(self.counts(), {"open": 0, "skipped": 3, "resolved": 0})
 
-    def test_skip_all_remaining_leaves_untouched_gaps_open(self):
-        self.default_gaps()
+
+class GateTests(PipelineCase):
+    def test_unresolved_critical_or_high_blocks_whatever_the_state_of_the_rest(self):
+        self.four_level_gaps()
+        self.assertEqual(self.blockers(), ["GAP-001", "GAP-002"])
         self.decide("GAP-001", "Lock the account after five failed attempts for 30 minutes.")
-        code, result = self.gaps("skip", "--gap-id", "GAP-002")
-        self.assertEqual(code, 0, result)
-        # "Skip all remaining" makes no store call: GAP-003 keeps its status.
-        self.assertEqual(self.counts(), {"open": 1, "skipped": 1, "resolved": 1})
+        self.assertEqual(self.blockers(), ["GAP-002"])  # a resolved Critical does not release an open High
+        self.gaps("skip", "--gap-id", "GAP-002")
+        self.assertEqual(self.blockers(), ["GAP-002"])  # skipped is not resolved
+
+    def test_blockers_are_listed_critical_first(self):
+        self.save_gaps([
+            make_gap("GAP-001", "High", "How long is a reset link valid?", ["REQ-002"]),
+            make_gap("GAP-002", "Low", "Which formats can reports be exported in?", ["REQ-005"]),
+            make_gap("GAP-003", "Critical", "Should the account lock after failed logins?", ["REQ-001"]),
+        ])
+        self.assertEqual(self.blockers(), ["GAP-003", "GAP-001"])
+
+    def test_gate_passes_with_critical_and_high_resolved_and_medium_low_open_or_skipped(self):
+        self.four_level_gaps()
+        self.decide("GAP-001", "Lock the account after five failed attempts for 30 minutes.")
+        self.decide("GAP-002", "A reset link is valid for 24 hours.")
+        self.gaps("skip", "--gap-id", "GAP-003")  # Medium skipped, Low still open
+        self.assertEqual(self.counts(), {"open": 1, "skipped": 1, "resolved": 2})
+        self.assertEqual(self.blockers(), [])
+        # Phase 3 proceeds; only the resolved decisions are pending for enrichment.
         self.generate_stories()
+        code, info = self.stories("inspect")
+        self.assertEqual({p["gap_id"] for p in info["pending_decisions"]}, {"GAP-001", "GAP-002"})
+        self.assertEqual(self.counts(), {"open": 1, "skipped": 1, "resolved": 2})
+
+    def test_gate_passes_for_an_empty_register(self):
+        self.save_gaps([])
+        code, listing = self.gaps("list")
+        self.assertEqual(code, 0, listing)
+        self.assertEqual(listing["eligible_count"], 0)
+        self.assertEqual(self.blockers(), [])
+
+    def test_reopening_a_critical_gap_blocks_the_gate_again(self):
+        self.four_level_gaps()
+        self.decide("GAP-001", "Lock the account after five failed attempts for 30 minutes.")
+        self.decide("GAP-002", "A reset link is valid for 24 hours.")
+        self.assertEqual(self.blockers(), [])
+        code, result = self.gaps("reopen", "--gap-id", "GAP-001")
+        self.assertEqual(code, 0, result)
+        self.assertEqual(self.blockers(), ["GAP-001"])
+
+    def test_gate_cannot_be_verified_when_the_register_is_missing_or_invalid(self):
+        self.assertIsNone(self.blockers())  # no register yet
+        self.four_level_gaps()
+        with open(self.register, encoding="utf-8") as handle:
+            gaps = json.load(handle)
+        gaps[0]["status"] = "resolved"  # resolved without a decision
+        self.write_json(self.register, gaps)
+        self.assertIsNone(self.blockers())
+
+    def test_gate_cannot_be_verified_when_the_atomic_requirements_changed(self):
+        self.four_level_gaps()
+        self.write_json(self.atomic, REQUIREMENTS[:-1])
+        self.assertIsNone(self.blockers())
 
 
 class PartialResolutionTests(PipelineCase):
     def test_only_resolved_gap_decisions_enrich_stories(self):
-        self.default_gaps()
+        self.four_level_gaps()
         text = "Lock the account after five consecutive failed login attempts for 30 minutes."
         self.decide("GAP-001", text)
-        self.gaps("skip", "--gap-id", "GAP-002")
-        # GAP-003 stays open.
+        self.decide("GAP-002", "A reset link is valid for 24 hours.")
+        self.gaps("skip", "--gap-id", "GAP-003")
+        # GAP-004 (Low) stays open. Neither it nor the skipped Medium gap blocks Phase 3.
+        self.assertEqual(self.blockers(), [])
         self.generate_stories()
         code, info = self.stories("inspect")
-        self.assertEqual([p["gap_id"] for p in info["pending_decisions"]], ["GAP-001"])
+        self.assertEqual({p["gap_id"] for p in info["pending_decisions"]}, {"GAP-001", "GAP-002"})
         self.enrich("GAP-001", "no_change_required")
+        self.enrich("GAP-002", "no_change_required")
         with open(self.paths_state(), encoding="utf-8") as handle:
             ledger = json.load(handle)["decision_ledger"]
-        self.assertEqual(list(ledger), ["GAP-001"])
+        self.assertEqual(set(ledger), {"GAP-001", "GAP-002"})
         code, _ = self.stories("regenerate-report")
         self.assertEqual(code, 0)
         page = read_text(self.report)
         self.assertIn(text, page)
-        self.assertEqual(self.counts(), {"open": 1, "skipped": 1, "resolved": 1})
+        self.assertEqual(self.counts(), {"open": 1, "skipped": 1, "resolved": 2})
 
     def paths_state(self):
         return os.path.join(self.root, "stories", "story-generation-state.json")
@@ -292,7 +414,8 @@ class InterruptedRunTests(PipelineCase):
         self.default_gaps()
         self.decide("GAP-001", "Lock the account after five failed attempts for 30 minutes.")
         self.gaps("skip", "--gap-id", "GAP-002")
-        # The user stops here: nothing further is written, Phase 3 is not started.
+        # The user stops here (or the gate is blocked and they exit): Phase 3 is not started.
+        self.assertEqual(self.blockers(), ["GAP-002"])
         self.assertFalse(os.path.exists(os.path.join(self.root, "stories")))
         # A new process (the resumed run) sees everything exactly as it was left.
         code, info = self.gaps("inspect")
@@ -303,9 +426,11 @@ class InterruptedRunTests(PipelineCase):
         with open(self.register, encoding="utf-8") as handle:
             gaps = {g["gap_id"]: g for g in json.load(handle)}
         self.assertEqual(len(gaps["GAP-001"]["decisions_recorded"]), 1)
-        # The resumed run finishes triage and carries on to Phase 3.
+        # The resumed run resolves the blocker, the gate passes, and Phase 3 starts with GAP-003 still open.
         self.decide("GAP-002", "A reset link is valid for 24 hours.")
+        self.assertEqual(self.blockers(), [])
         self.generate_stories()
+        self.assertEqual(self.counts(), {"open": 1, "skipped": 0, "resolved": 2})
 
     def test_rerunning_story_generation_neither_duplicates_nor_changes_anything(self):
         self.default_gaps()

@@ -26,11 +26,11 @@ It guides you through the whole flow and asks before it overwrites anything:
 | 1. Source | Finds existing artifacts, asks where the requirements are. | Give a file, folder or path; confirm the match. |
 | 2. Phase 1: atomic requirements | Splits the requirements into atomic, traceable `REQ-xxx` items, validated and saved. | Nothing. |
 | 3. Phase 2: gap analysis | Finds missing, ambiguous or conflicting information, prioritises it (Critical to Low) and builds the gap register and dashboard. | Nothing. |
-| 4. Phase 2: triage | Shows gaps one at a time, Critical first. | Give a decision, skip the gap, skip all, or stop (progress is saved). |
+| 4. Phase 2: triage | Shows gaps one at a time, Critical first. Every Critical and High gap must be resolved before stories are generated; if any is left open or skipped, you are returned to triage for those gaps. Medium and Low gaps may stay open. | Give a decision, skip the gap, skip all, or stop (progress is saved). |
 | 5. Phase 3: stories | Appends a `# Development Stories` section to your requirements document, then enriches only the stories your decisions affect. | Pick the target document if there are several; confirm the preview. |
 | 6. Report | Writes `report/phase3-report.html` and prints a summary with real counts. | Open the report in a browser. |
 
-**Resume or re-run at any time.** Run `/ba-requirements:run` again: existing work is detected and reused, stories keep their IDs, and answered gaps stay answered. Edit your requirements, or settle skipped gaps later, and re-run to reconcile.
+**Resume at any time.** `/ba-requirements:run` records a checkpoint after every operation (in `.ba-requirements/pipeline-state.json`). Run it again after an interruption and it shows the last completed operation and asks whether to **Resume** or **Start a new run**. A resume re-checks what was completed, skips what is still valid and continues from the first incomplete or invalid operation; stories keep their IDs and answered gaps stay answered. Edit your requirements, or settle skipped gaps later, and the affected operations (and the ones after them) are rerun.
 
 Prefer to go step by step? Every phase is also a standalone command, see below.
 
@@ -81,14 +81,31 @@ Out of scope: Jira integration, story approval workflows, test cases, writing ga
 
 One command for the whole workflow. It is an orchestration layer only: each phase is carried out by following the existing phase command (`start-analysis`, `analyse-gaps`, `triage-gaps`, `generate-stories`, `enrich-stories`, `generate-report`), so all validation, confirmation and safe-write behaviour is the same as running them one by one, and every phase command stays usable on its own.
 
+0. Reads the checkpoint first (see "Checkpoint and resume" below) and offers to resume an unfinished run.
 1. Asks where the requirements are, then detects existing artifacts (atomic requirements, gap register, stories section, report). Nothing is overwritten silently; a valid existing `atomic_requirements.json` can be reused or regenerated, with a warning if a source file is newer than it.
 2. **Phase 1.** Atomic requirements, validated and saved. A failure stops the pipeline.
-3. **Phase 2.** Gap analysis, saved register and gap report (validation gate), then interactive triage one gap at a time: give a decision, skip this gap, skip all remaining gaps (the pipeline continues), or stop (the pipeline pauses; every answer already given is saved and `/ba-requirements:run` resumes).
-4. **Phase 3.** Stories are generated even when gaps are open or skipped, then enriched using only the decisions of resolved gaps. Stories keep exactly four fields; mappings stay in `stories/story-generation-state.json`.
-5. Refreshes `report/phase3-report.html`. If that fails, the document and state stay valid, the previous report is kept, and the summary says the report is stale or unavailable.
-6. Prints a final summary of actual counts and statuses (sources, requirements, gaps by priority and status, decisions, stories generated and enriched, validation per phase, report path and status, remaining follow-up).
+3. **Phase 2.** Gap analysis, saved register and gap report (validation gate), then interactive triage one gap at a time: give a decision, skip this gap, skip all remaining gaps, or stop (the pipeline pauses; every answer already given is saved and `/ba-requirements:run` resumes).
+4. **Story-generation gate.** Phase 3 starts only when every **Critical and High** gap is `resolved`. If any is open or skipped, including after "skip" or "skip all remaining", the pipeline names them and returns you to triage for those gaps; you can also exit and resume later. Medium and Low gaps may stay open or skipped and do not block.
+5. **Phase 3.** Stories are generated, then enriched using only the decisions of resolved gaps. Stories keep exactly four fields; mappings stay in `stories/story-generation-state.json`.
+6. Refreshes `report/phase3-report.html`. If that fails, the document and state stay valid, the previous report is kept, the run is recorded as stopped at the report (not completed), and the summary says the report is stale or unavailable; resuming reruns only the report.
+7. Runs a final validation, marks the run completed only if it succeeds, and prints a summary of actual counts and statuses (run ID, last completed, skipped and rerun operations, sources, requirements, gaps by priority and status, decisions, stories generated and enriched, validation per phase, report path and status, remaining follow-up).
 
-A failed gate prints a "stopped" summary that names the phase, the reason, what was preserved and how to continue. Dependencies are never installed automatically.
+### Checkpoint and resume
+
+The pipeline has nine operations, each checkpointed separately: resolve the source, generate atomic requirements, gap analysis, gap triage, the Critical/High gate, story generation, enrichment, the HTML report, and final validation. The state is written before an operation starts (`in_progress`) and immediately after it completes, through a temporary file and an atomic replace, so a crash never leaves a half-written checkpoint. During triage every answer, skip and status change is recorded as it happens. The checkpoint holds the run ID, status (`in_progress`, `completed`, `blocked`, `failed`), source files, the current and last completed operation, per-operation status, timestamps, input and output fingerprints, output paths and concise errors, and never copies requirements, gaps, stories or report content.
+
+On resume the completed operations are re-validated before they are trusted:
+
+- **Changed input.** Source files are fingerprinted outside the managed `# Development Stories` section (so the stories Phase 3 writes do not count as a change). If a source file or an upstream artifact changed, that operation and everything after it are reset and rerun; existing decisions, gap IDs and story IDs are preserved by the phases' own reconciliation.
+- **Missing or invalid output.** A missing, corrupted or no-longer-valid artifact reruns the operation that produces it and what follows.
+- **Interrupted operation.** An operation that was `in_progress` is simply rerun; the phase commands are safe to rerun.
+- **Source changed mid-run.** The run stops before applying stale results, names the change and asks whether to restart from source analysis.
+- **Gate.** Unresolved Critical or High gaps keep `gate_validation` blocked and refuse to start story generation, on a first run and after any resume. Open or skipped Medium and Low gaps never block.
+- **Damaged checkpoint.** A missing, corrupt or incompatible file is reported and a fresh run is offered; the old file is archived under `.ba-requirements/history/`, never silently discarded. A completed run is never reused as a new execution.
+
+The individual phase commands keep working on their own; when they change an artifact they refresh the checkpoint so a later `/ba-requirements:run` does not trust a stale completion record.
+
+The gate applies only to the master command. `/ba-requirements:generate-stories` still works on its own and does not require resolved gaps. A failed gate, a pause or an exit prints a "stopped" or "paused" summary that names the phase, the reason (including the blocking gaps), what was preserved and how to continue. Dependencies are never installed automatically.
 
 ## Phase 1 — `/ba-requirements:start-analysis`
 
@@ -299,6 +316,7 @@ Then run the commands from your project directory. Use `/reload-plugins` after e
 | `scripts/validate-development-stories.py` | Validates a structured story draft (structure, IDs, references, duplicates, coverage, applied decisions) or the managed section of a document. Exit `0` valid, `1` invalid, `2` unreadable. |
 | `scripts/sync-development-stories.py` | Safe persistence used by the Phase 3 commands: `inspect`, `export`, `apply`, `accept`, `summary`, `regenerate-report`. |
 | `scripts/generate-phase3-report.py` | Builds `report/phase3-report.html`. |
+| `scripts/pipeline-state.py` | Checkpoint and resume state for `/ba-requirements:run`: `inspect`, `begin`, `resume`, `start`, `check-inputs`, `complete`, `fail`, `block`, `triage-event`, `invalidate`, `refresh`, `gate`, `summary`. Exit `0` ok, `1` refused or blocked, `2` unreadable. |
 
 ```text
 python scripts/validate-atomic-requirements.py atomic_requirements/atomic_requirements.json
@@ -317,7 +335,7 @@ The gap validator checks JSON syntax, the exact property sets, enumerations, ID 
 python -m unittest discover -s tests -v
 ```
 
-`tests/test_master_pipeline.py` checks that `commands/run.md` is well formed and refers only to files, scripts and commands that exist, that the phase commands do not depend on it, and drives the real scripts through a full run, all gaps skipped, partly resolved gaps, an interrupted and resumed triage and failed validation gates. The tests cover the validators, safe persistence (including simulated failed saves and concurrent edits), triage state changes, the HTML reports (statuses, decisions, escaping), unchanged-input detection and reconciliation safeguards, and for Phase 3 the section boundary rules, story ID handling, idempotent re-runs, enrichment bookkeeping, manual-edit detection and reconciliation, and the report. Judgements that depend on the model (quality of the gaps found, story decomposition and wording, whether a decision changes a story, asking for clarification) are specified in the agents, skills and rules and are not unit-testable.
+`tests/test_master_pipeline.py` checks that `commands/run.md` is well formed and refers only to files, scripts and commands that exist, that the phase commands do not depend on it, and drives the real scripts through a full run, all gaps skipped, partly resolved gaps, an interrupted and resumed triage and failed validation gates. `tests/test_pipeline_state.py` drives the checkpoint script through crash-safe writes, resume from every kind of interruption, change detection and downstream invalidation, corrupt, incompatible and inconsistent checkpoints, per-answer triage recovery and the Critical/High gate before and after a resume. The tests cover the validators, safe persistence (including simulated failed saves and concurrent edits), triage state changes, the HTML reports (statuses, decisions, escaping), unchanged-input detection and reconciliation safeguards, and for Phase 3 the section boundary rules, story ID handling, idempotent re-runs, enrichment bookkeeping, manual-edit detection and reconciliation, and the report. Judgements that depend on the model (quality of the gaps found, story decomposition and wording, whether a decision changes a story, asking for clarification) are specified in the agents, skills and rules and are not unit-testable.
 
 ## Layout
 

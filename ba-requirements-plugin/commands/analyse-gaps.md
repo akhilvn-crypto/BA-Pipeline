@@ -151,3 +151,13 @@ Validation: Passed
 For a reconciliation also list gaps kept, updated, reopened, new and retired. For an unchanged input say "Existing gap analysis is current; register reused." If there are no gaps, say that the register is empty and the report shows an empty state. Show the open / skipped / resolved counts, mention that the HTML report is read-only, and suggest `/ba-requirements:triage-gaps` as the next step.
 
 If validation did not pass, a save failed, or the user cancelled, do not print "Gap analysis completed." Say exactly what was and was not done. Mention the notes from the agent that the user should know (consolidations, judgement calls).
+
+## Pipeline checkpoint (final step, non-fatal)
+
+If `<project root>/.ba-requirements/pipeline-state.json` exists, an unfinished pipeline run must not keep relying on results this command may have just changed. Run:
+
+```text
+python ${CLAUDE_PLUGIN_ROOT}/scripts/pipeline-state.py refresh --project-root <project root>
+```
+
+It re-validates the recorded run and resets any operation whose inputs or outputs changed, together with the operations after it, so the next run offers to continue from there. It never changes a phase artifact. If `invalidated` is not empty, say so in one line. A missing or unusable checkpoint, or a failure of this call, is not an error for this command: ignore it. Never edit the checkpoint by hand.

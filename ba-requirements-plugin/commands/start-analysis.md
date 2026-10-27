@@ -1,6 +1,6 @@
 ---
 description: Analyse Markdown requirements and save validated atomic requirements as JSON (BA Requirements, Phase 1)
-allowed-tools: Read, Glob, Grep, Agent, AskUserQuestion
+allowed-tools: Read, Glob, Grep, Agent, AskUserQuestion, Bash(python:*), Bash(python3:*), Bash(py:*)
 ---
 
 # BA Requirements — Start Analysis (Phase 1)
@@ -109,3 +109,13 @@ Phase 1 completed successfully.
 ```
 
 If any source was not fully read, a file was excluded or failed, validation did not pass, or the user cancelled, do not print "COMPLETED". Use "BA REQUIREMENT ANALYSIS — INCOMPLETE" (or "CANCELLED"), say exactly what was and was not processed, and list non-Markdown files that were excluded. Mention notes from the analyst that the user should know (duplicates consolidated, ambiguities kept as written, content skipped).
+
+## Pipeline checkpoint (final step, non-fatal)
+
+If `<project root>/.ba-requirements/pipeline-state.json` exists, an unfinished pipeline run must not keep relying on results this command may have just changed. Run:
+
+```text
+python ${CLAUDE_PLUGIN_ROOT}/scripts/pipeline-state.py refresh --project-root <project root>
+```
+
+It re-validates the recorded run and resets any operation whose inputs or outputs changed, together with the operations after it, so the next run offers to continue from there. It never changes a phase artifact. If `invalidated` is not empty, say so in one line. A missing or unusable checkpoint, or a failure of this call, is not an error for this command: ignore it. Never edit the checkpoint by hand.
