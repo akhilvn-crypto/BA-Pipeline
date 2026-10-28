@@ -159,10 +159,10 @@ Run it again at any time:
 
 Presents open and skipped gaps one at a time, Critical first, then High, Medium, Low, and by gap number within a priority:
 
-Each gap is shown with its ID, priority and one concise gap statement, followed by these choices:
+Each gap is asked as a question with selectable options, showing its ID, priority and one concise gap statement. **Other** is always available for typing a decision or a question:
 
-- **Critical and High gaps:** **Skip for now** (the gap becomes `skipped`) or **Other**.
-- **Medium and Low gaps:** **Skip all remaining gaps** (every remaining Medium/Low gap in this run becomes `skipped`), **Skip this gap**, or **Other**.
+- **Critical and High gaps:** **Skip for now** (the gap becomes `skipped`), **Stop triage**, or **Other**.
+- **Medium and Low gaps:** **Skip this gap**, **Skip all remaining gaps** (every remaining Medium/Low gap in this run becomes `skipped`), or **Other**.
 
 What they do:
 

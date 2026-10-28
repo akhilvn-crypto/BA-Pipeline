@@ -22,38 +22,34 @@ Each prints JSON with `ok`. Exit 0 = done, 1 = refused (nothing changed), 2 = I/
 
 ## Presenting a gap
 
-Show, in plain readable text, the gap's ID, priority and one concise gap statement (shorten `gap_definition` to a single sentence without changing its meaning), then the choices for its priority:
+Ask the question with AskUserQuestion, one gap per call, one question, `multiSelect: false`. Do not print the choices as a text list.
 
-```text
-Gap 2 of 12 — GAP-005 — Critical (skipped earlier)
+- `header`: the gap ID (e.g. `GAP-005`).
+- `question`: the gap's progress, ID, priority and one concise gap statement (shorten `gap_definition` to a single sentence without changing its meaning), ending with a question mark, e.g. `Gap 2 of 12 — GAP-005 — Critical (skipped earlier): <one concise gap statement> What is your decision?` If the gap was reopened, add `Previous decisions: <with dates>` before the question.
+- `options`: the list for the gap's `priority` below. Do not add an "Other" option; AskUserQuestion provides it automatically, and it is where the user types a decision, a description or a question about the gap.
 
-<one concise gap statement>
+**Critical and High gaps** — two options:
 
-Previous decisions: <only if the gap was reopened; show them with dates>
+- **Skip for now** — skip this gap and continue. It stays unresolved and still blocks story generation.
+- **Stop triage** — pause here; everything already saved stays. Run the command again to resume.
 
-Choices:
-- Skip for now — skip this gap and continue.
-- Other — enter a description or decision in free text.
-```
+**Medium and Low gaps** — two options:
 
-**Critical and High gaps** offer exactly these choices:
-
-- **Skip for now** — skip this gap and continue.
-- **Other** — the user enters a description or decision in free text.
-
-**Medium and Low gaps** offer exactly these choices:
-
-- **Skip all remaining gaps** — skip all remaining Medium/Low gaps in the current triage run.
 - **Skip this gap** — skip only the current gap and continue.
-- **Other** — the user enters a description or decision in free text.
+- **Skip all remaining gaps** — skip all remaining Medium/Low gaps in the current triage run.
 
-Present the choices as text and take the user's reply; do not use AskUserQuestion for them (a Critical/High gap has only one fixed choice besides free text). Choose the list by the gap's `priority`. "Skip all remaining gaps" is never offered for a Critical or High gap.
+"Skip all remaining gaps" is never offered for a Critical or High gap. (AskUserQuestion needs at least two options, which is why Critical/High gaps carry **Stop triage** beside **Skip for now**.)
 
-Reopening a resolved gap, revising a recorded decision and stopping stay available when the user asks for them, but they are not listed as choices.
+Handle the answer:
+
+- A listed option: act as described under its heading below.
+- Free text from "Other": a decision to capture (see "Capturing a decision"). If it is only a description or question, answer or clarify and ask the same question again.
+
+Reopening a resolved gap and revising a recorded decision stay available when the user asks for them, but they are not listed as options.
 
 ## Capturing a decision
 
-1. Take the text the user entered under **Other** (a decision or a description) as the starting point. If it is only a description or question and not a decision, answer or clarify as needed and show the choices again.
+1. Take the text the user entered under **Other** (a decision or a description) as the starting point. If it is only a description or question and not a decision, answer or clarify as needed and ask the gap question again with the same options.
 2. Check it against the gap definition. If the gap asks "whether, how many, how long" and the answer covers only part, ask one focused follow-up for the missing part. Ask again only if still unclear.
 3. Treat these as not yet decisions, and offer to skip instead of recording them: "I don't know", "TBD", "ask someone else", "whatever is standard".
 4. Do not propose a business answer, fill gaps with your own assumptions or choose between alternatives for the user. You may restate ambiguity and ask which meaning is intended.

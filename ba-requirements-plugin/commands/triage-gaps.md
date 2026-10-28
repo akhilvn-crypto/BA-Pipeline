@@ -44,12 +44,12 @@ python -c "import tempfile; print(tempfile.mkdtemp(prefix='ba-triage-'))"
 
 Open with one short line: how many gaps are eligible and how many of those were skipped earlier. Then go through the queue in the order returned, one gap at a time, exactly as the `gap-triage` skill describes: present the gap with its progress, ask what the user wants, capture and confirm any decision, save immediately, and continue.
 
-Choices per gap (show the ID, priority and one concise gap statement, then):
+Ask each gap with AskUserQuestion (never as a printed list). The question holds the progress, ID, priority and one concise gap statement; the user's free-text decision goes in the automatic **Other** entry, which you do not add yourself. Options per gap:
 
-- Critical and High: **Skip for now**; **Other** (free-text description or decision).
-- Medium and Low: **Skip all remaining gaps** (all remaining Medium/Low gaps in this run); **Skip this gap**; **Other** (free-text description or decision).
+- Critical and High: **Skip for now**; **Stop triage** (AskUserQuestion needs two options).
+- Medium and Low: **Skip this gap**; **Skip all remaining gaps** (all remaining Medium/Low gaps in this run).
 
-Reopening a resolved gap, revising a recorded decision and stopping are available when the user asks, but are not listed as choices.
+Reopening a resolved gap and revising a recorded decision are available when the user asks, but are not listed as options.
 
 Hard rules (details in `gap-triage-rules.md`):
 

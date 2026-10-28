@@ -185,7 +185,7 @@ Otherwise run triage, then the gate.
 
 `pipeline-state.py start --operation gap_triage` first (a resumed triage simply starts again and presents the remaining open and skipped gaps, Critical and High first). Follow `triage-gaps.md` Steps 1–3 (the `gap-triage` skill): one gap at a time, Critical first, each decision confirmed before it is recorded and saved immediately through the store, and each answer, skip or status change recorded at once with `triage-event` (see "Checkpoint protocol"). The user can:
 
-- enter a decision under **Other**, which resolves the gap once confirmed;
+- enter a decision under **Other**, which resolves the gap once confirmed (each gap is asked with AskUserQuestion, as the skill describes);
 - **Skip for now** (Critical and High) or **Skip this gap** (Medium and Low): the gap becomes `skipped` and stays unresolved. If the gap is Critical or High, say in one line that it still blocks story generation until it is resolved;
 - **skip all remaining gaps** (offered on Medium and Low gaps only): every remaining open Medium/Low gap is recorded as `skipped` at once, one at a time through the store, each with its `triage-event`; Critical and High gaps are never affected. This ends the pass; it does **not** continue to Phase 3. Complete `gap_triage` and go to 5b;
 - **stop / exit**: the pipeline **pauses**. Everything already confirmed is already saved in the register and the checkpoint. Leave `gap_triage` as it is (`in_progress`), do not start Phase 3. Go to Step 9 with status `PAUSED` and tell the user that running `/ba-requirements:run` again offers Resume (the source and Phase 1 and 2 outputs are validated and reused, and triage returns to the remaining open and skipped gaps, Critical and High first).
