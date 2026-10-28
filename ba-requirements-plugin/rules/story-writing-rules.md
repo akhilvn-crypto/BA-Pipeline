@@ -34,7 +34,7 @@ Rules:
 1. Keep the summary concise but descriptive (typically 3-7 words): a label of the core capability, neither a vague word nor a full explanatory sentence.
 2. The criteria are **one statement**, not several bullets, scenarios or **Given/When/Then** (the validator rejects Gherkin and more than one statement). They describe what the system must do, not how it is implemented, and are specific, observable and testable.
 3. State only the primary functional outcome in that one short statement and preserve the story's core intent. Detailed conditions, alternate flows, edge cases and exhaustive business rules live only in the detailed story and are not duplicated here. Never invent behaviour.
-4. Exclude detailed scenarios, implementation notes, technical design and every non-functional criterion (performance, availability, accessibility, security targets and so on). Those live only in the detailed story.
+4. Exclude detailed scenarios, implementation notes, technical design and every non-functional criterion (performance, availability, accessibility, security targets and so on). Those live only in the detailed story. The requirements document holds functional stories only: a story whose summary or statement is a non-functional requirement (for example "Keyboard and accessible form use") is rejected by the validator; it belongs in the Non-Functional Requirements of the functional stories it constrains.
 5. No description, no preconditions, no metadata of any kind. Requirement IDs, gap IDs, decisions, priorities and statuses never appear in a story.
 
 ## The detailed story (`stories/detailed_stories.md`)
@@ -57,7 +57,7 @@ Rules:
 
 1. Include only details supported by the atomic requirements and by the latest decision of a resolved gap. Never invent an answer for an unresolved gap, and never add placeholders, "TBD" or open questions.
 2. Keep functional and non-functional requirements with the story they belong to. A non-functional requirement that constrains one story goes in that story's Non-Functional Requirements; one that applies to several is stated in each of them.
-3. A purely technical or system requirement that no functional story carries becomes a system story ("As the system, I must ..."). Its ultra-lean criteria state only the observable outcome of the capability; the measurable quality targets stay in its detailed Non-Functional Requirements.
+3. **A non-functional requirement is never a story of its own.** Performance, availability, accessibility (keyboard use, labelled fields, readable errors), usability, compliance, scalability and similar quality attributes are written into the Non-Functional Requirements of every functional story they constrain (a requirement that applies to all forms goes in each story with a form), and the requirement is listed in those stories' sources. They never appear in the requirements document: not as a story, not in a summary and not in a lean criterion. A system story ("As the system, I must ...") is only for functional system behaviour that no user story carries (for example a scheduled job or a notification), never for a quality attribute.
 4. Do not copy requirement IDs, gap IDs or decision metadata into the story text. Say what the rule is, not where it came from.
 5. Preserve conditions, limits and values exactly as the requirements and decisions state them.
 
@@ -84,7 +84,7 @@ The draft format that carries both representations is in `schemas/development-st
 2. Group closely related requirements into one story when they describe one cohesive user outcome.
 3. Split requirements that are independently deliverable capabilities.
 4. Do not generate one story per requirement mechanically. A story is neither too broad to implement and test, nor so small that it has no meaningful outcome of its own.
-5. Keep business rules and constraints. Express technical or system constraints as non-functional requirements of the story they constrain, or as a system story, rather than dropping them.
+5. Keep business rules and constraints. Express technical or system constraints as non-functional requirements of the functional stories they constrain, rather than dropping them or making a story of them (see rule 3 of the detailed story).
 6. One requirement may appear in several stories when they cover different capabilities; one story may draw on several requirements.
 7. Do not write two stories for the same capability.
 8. Every atomic requirement ends up in at least one story, or is listed in `not_covered_requirements` with a reason. Silence is not an option.

@@ -20,8 +20,9 @@ Two modes, standard library only:
 A schema-valid story is not automatically a good story: semantic review (coherent capability,
 testable criteria, no invented decisions) is the agent's job and is specified in rules/ and
 skills/. This script prints a few lint warnings (vague wording, a summary that is not short, a
-long or non-functional-looking lean criterion); warnings never fail validation. One lean rule is
-enforced: lean criteria are one plain functional statement, not Given/When/Then scenarios. Detailed criteria are plain statements too (a Given/When/Then wording only draws a warning).
+long lean criterion); warnings never fail validation. Lean rules enforced on a draft: lean criteria are one
+plain functional statement, not Given/When/Then scenarios, and neither the summary nor the lean criteria (nor a story's
+whole functional behaviour) may be a non-functional requirement. In a saved document the non-functional check is advice. Detailed criteria are plain statements too (a Given/When/Then wording only draws a warning).
 
 Exit status: 0 = valid, 1 = validation failed, 2 = a file could not be read.
 """
@@ -63,9 +64,16 @@ MIN_SUMMARY_WORDS = 2
 MAX_SUMMARY_WORDS = 7
 MAX_LEAN_CRITERION_WORDS = 30
 _GHERKIN_RE = re.compile(r"^\s*given\b.*\bwhen\b.*\bthen\b", re.IGNORECASE | re.DOTALL)
+# Quality attributes (accessibility, performance, availability, compliance, security-in-operation). They belong in the
+# detailed story's Non-Functional Requirements, never in a summary or lean criterion of the requirements document.
+# Terms that are often a business feature on their own (audit, availability of a product, a performance review) are not listed.
 _NON_FUNCTIONAL_RE = re.compile(
-    r"\b(?:performance|latency|throughput|availability|uptime|scalab\w*|concurren\w*|accessib\w*|response time|"
-    r"within\s+\d+(?:\.\d+)?\s*(?:ms|milliseconds?|seconds?)|\d+(?:\.\d+)?\s*(?:ms|milliseconds))",
+    r"\b(?:accessib\w*|keyboard|screen[- ]?readers?|assistive|wcag|aria|colou?r contrast|contrast ratios?|focus order|tab order|"
+    r"label+ed\s+(?:fields?|inputs?|controls?)|"
+    r"performance(?!\s+(?:review|appraisal|rating|management))|latency|throughput|uptime|(?:system|service)\s+availability|availability\s+(?:target|of the (?:system|service))|\d+(?:\.\d+)?\s*%\s+availability|"
+    r"scalab\w*|concurrent\s+(?:users|sessions|requests)|concurrency|response times?|load times?|page loads?|fail-?over|disaster recovery|\bRTO\b|\bRPO\b|"
+    r"within\s+\d+(?:\.\d+)?\s*(?:ms|milliseconds?|seconds?)|\d+(?:\.\d+)?\s*(?:ms|milliseconds)|"
+    r"gdpr|hipaa|pci[- ]?dss|soc\s?2|iso\s?27001|cross-browser|supported browsers?|encrypt\w*\s+(?:at rest|in transit)|at rest|in transit)\b",
     re.IGNORECASE,
 )
 _ABBREVIATION_RE = re.compile(r"\b(?:e\.g|i\.e|etc|vs)\.", re.IGNORECASE)
@@ -77,8 +85,10 @@ def _sentence_count(text):
     return len([part for part in _SENTENCE_BREAK_RE.split(" ".join(text.split())) if part.strip()])
 
 
-def lean_warnings(label, summary, criteria):
-    """Advisory warnings for an ultra-lean story that is longer or less functional than the standard asks."""
+def lean_warnings(label, summary, criteria, include_nfr=True):
+    """Advisory warnings for an ultra-lean story that is longer or less functional than the standard asks.
+
+    include_nfr=False leaves out the non-functional warning where the caller reports it as an error instead."""
     found = []
     words = len(summary.split())
     if _sentence_count(summary) > 1 or words > MAX_SUMMARY_WORDS:
@@ -90,8 +100,26 @@ def lean_warnings(label, summary, criteria):
     for item in criteria:
         if len(item.split()) > MAX_LEAN_CRITERION_WORDS:
             found.append(f"{label}: the acceptance criteria statement is long ({len(item.split())} words); keep only the primary functional outcome and leave conditions, rules and scenarios to the detailed story.")
-        if _NON_FUNCTIONAL_RE.search(item):
+        if include_nfr and _NON_FUNCTIONAL_RE.search(item):
             found.append(f"{label}: the acceptance criteria statement looks like a non-functional requirement; non-functional detail belongs in the detailed story only.")
+    return found
+
+
+def non_functional_errors(label, summary, criteria, behaviours):
+    """Errors for a story that carries a quality attribute into the requirements document, or is nothing but one.
+
+    The requirements document holds functional stories only. A non-functional requirement is never a story of its own:
+    it goes in the Non-Functional Requirements of the functional stories it constrains, in the detailed story."""
+    found = []
+    hit = _NON_FUNCTIONAL_RE.search(summary)
+    if hit:
+        found.append(f"{label}: the summary names a non-functional requirement ('{hit.group(0)}'). A non-functional requirement is not a story: remove this story and state the requirement in the Non-Functional Requirements of each functional story it constrains.")
+    for item in criteria:
+        hit = _NON_FUNCTIONAL_RE.search(item)
+        if hit:
+            found.append(f"{label}: the lean acceptance criteria statement is or contains a non-functional requirement ('{hit.group(0)}'). The requirements document holds functional outcomes only; move the quality target to the detailed story's Non-Functional Requirements.")
+    if behaviours and all(_NON_FUNCTIONAL_RE.search(item) for item in behaviours):
+        found.append(f"{label}: every functional behaviour item is a quality attribute, so this story has no functional behaviour. Attach the requirement to the functional stories it constrains as a Non-Functional Requirement instead of making it a story.")
     return found
 
 
@@ -339,7 +367,8 @@ def validate_draft(draft, requirements, register):
                 warnings.append(f"{label}: contains the vague phrase '{phrase}'; make it measurable or remove it.")
         if not re.search(r"\bas an?\b", canon_detail["description"], re.IGNORECASE):
             warnings.append(f"{label}: the detailed description does not use the 'As a ..., I want ..., so that ...' form; use a neutral formulation only when the actor or value is unclear.")
-        warnings.extend(lean_warnings(label, canon_lean["summary"], canon_lean["acceptance_criteria"]))
+        warnings.extend(lean_warnings(label, canon_lean["summary"], canon_lean["acceptance_criteria"], include_nfr=False))
+        errors.extend(non_functional_errors(label, canon_lean["summary"], canon_lean["acceptance_criteria"], canon_detail["functional_behaviour"]))
         for number in gherkin_criteria(canon_detail["acceptance_criteria"]):
             warnings.append(f"{label}: detailed criterion {number} is written as Given/When/Then; write it as a plain statement of the condition and the expected outcome.")
 

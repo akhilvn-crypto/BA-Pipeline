@@ -948,18 +948,42 @@ class ValidationTests(ProjectCase):
         errors, warnings = self.check(lambda d: d["stories"][0].__setitem__("summary", "Registered user login"))
         self.assertEqual((errors, warnings), ([], []))
 
-    def test_a_long_summary_or_a_non_functional_lean_criterion_is_advice_only(self):
+    def test_a_long_summary_is_advice_only(self):
         errors, warnings = self.check(lambda d: d["stories"][0].__setitem__("summary", "Allow registered users to authenticate themselves with an email address and a password"))
         self.assertEqual(errors, [])
         self.assertTrue(any("summary is not concise" in w for w in warnings))
-        errors, warnings = self.check(lambda d: d["stories"][0].__setitem__("lean_acceptance_criteria", ["The system logs users in. Login completes within 2 seconds."]))
-        self.assertEqual(errors, [])
-        self.assertTrue(any("looks like a non-functional requirement" in w for w in warnings), warnings)
         errors, warnings = self.check(lambda d: d["stories"][0].__setitem__("lean_acceptance_criteria", ["Password reset links are valid for 24 hours."]))
+        self.assertEqual([e for e in errors if "non-functional" in e], [])
         self.assertEqual([w for w in warnings if "non-functional" in w], [])
         words = " ".join(["word"] * 80)
         errors, warnings = self.check(lambda d: d["stories"][0].__setitem__("lean_acceptance_criteria", [words]))
         self.assertTrue(any("statement is long" in w for w in warnings))
+
+    def test_a_non_functional_requirement_in_the_lean_story_is_an_error(self):
+        errors, _ = self.check(lambda d: d["stories"][0].__setitem__("lean_acceptance_criteria", ["The system logs users in. Login completes within 2 seconds."]))
+        self.assertTrue(any("non-functional requirement ('within 2 seconds')" in e for e in errors), errors)
+        leaked = "Users can complete every action using the keyboard alone, with labelled fields and readable text error messages."
+        errors, _ = self.check(lambda d: d["stories"][0].__setitem__("lean_acceptance_criteria", [leaked]))
+        self.assertTrue(any("keyboard" in e and "Non-Functional Requirements" in e for e in errors), errors)
+
+    def test_a_story_that_is_only_a_non_functional_requirement_is_an_error(self):
+        def make_standalone(d):
+            story = d["stories"][0]
+            story["summary"] = "Keyboard and accessible form use"
+            story["lean_acceptance_criteria"] = ["Users can complete every action using the keyboard alone."]
+            story["detailed"]["functional_behaviour"] = ["Every action can be completed with the keyboard alone.", "The forms can be used with a screen reader."]
+        errors, _ = self.check(make_standalone)
+        self.assertTrue(any("summary names a non-functional requirement ('Keyboard')" in e for e in errors), errors)
+        self.assertTrue(any("lean acceptance criteria statement is or contains" in e for e in errors), errors)
+        self.assertTrue(any("every functional behaviour item is a quality attribute" in e for e in errors), errors)
+
+    def test_a_story_with_only_quality_attributes_as_behaviour_is_an_error(self):
+        errors, _ = self.check(lambda d: d["stories"][0]["detailed"].__setitem__("functional_behaviour", ["Pages load within 3 seconds.", "The system keeps 99.9% availability target."]))
+        self.assertTrue(any("every functional behaviour item is a quality attribute" in e for e in errors), errors)
+
+    def test_non_functional_requirements_stay_in_the_detailed_story_without_error(self):
+        errors, warnings = self.check(lambda d: d["stories"][0]["detailed"].__setitem__("non_functional_requirements", ["Every action can be completed with the keyboard alone.", "Form fields are labelled."]))
+        self.assertEqual((errors, warnings), ([], []))
 
     def test_the_documented_lean_checks_also_apply_to_the_saved_document(self):
         story = {"story_id": "US-001", "summary": "Log in", "acceptance_criteria": ["Given a, when b, then c.", "Login responds within 2 seconds."]}
