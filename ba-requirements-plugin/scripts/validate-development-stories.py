@@ -7,17 +7,21 @@ Two modes, standard library only:
                                   [--requirements F] [--gaps F] [--no-gaps]
       Validate the structured draft the Story Generation Agent produces (see
       schemas/development-stories.schema.json): structure, IDs, source requirement
-      references, applied decisions, duplicates, coverage, and that every story
-      survives a write-and-parse round trip as Markdown.
+      references, applied decisions, duplicates, coverage, the ultra-lean story (Story ID,
+      short summary, high-level functional criteria) and the detailed story (functional and
+      non-functional detail), and that both survive a write-and-parse round trip as Markdown.
 
   validate-development-stories.py --document FILE [--project-root DIR]
-      Validate the managed '# Development Stories' section of a Markdown document
-      against the strict four-field story contract.
+      Validate the managed '# Development Stories' section of a Markdown document (the
+      ultra-lean stories) against the lean story contract, the consolidated
+      <project-root>/stories/detailed_stories.md against the detailed story contract, and that
+      the two match by Story ID and summary and are current in the story state.
 
-A schema-valid story is not automatically a good story: semantic review (coherent
-capability, testable criteria, no invented decisions) is the agent's job and is
-specified in rules/ and skills/. This script prints a few lint warnings for vague
-wording; warnings never fail validation.
+A schema-valid story is not automatically a good story: semantic review (coherent capability,
+testable criteria, no invented decisions) is the agent's job and is specified in rules/ and
+skills/. This script prints a few lint warnings (vague wording, a summary that is not short, a
+long or non-functional-looking lean criterion); warnings never fail validation. One lean rule is
+enforced: lean criteria are plain functional bullets, not Given/When/Then scenarios.
 
 Exit status: 0 = valid, 1 = validation failed, 2 = a file could not be read.
 """
@@ -46,12 +50,53 @@ def _load_common():
 common = _load_common()
 
 DRAFT_KEYS = ("stories", "not_covered_requirements", "decisions_reviewed")
-STORY_KEYS = ("story_id", "summary", "description", "acceptance_criteria", "source_requirement_ids", "applied_decisions")
-STORY_REQUIRED = ("summary", "description", "acceptance_criteria", "source_requirement_ids")
+STORY_KEYS = ("story_id", "summary", "lean_acceptance_criteria", "detailed", "lean_reviewed", "source_requirement_ids", "applied_decisions")
+STORY_REQUIRED = ("summary", "lean_acceptance_criteria", "detailed", "source_requirement_ids")
+DETAILED_REQUIRED = common.DETAILED_REQUIRED
 OUTCOMES = ("incorporated", "no_change_required")
 MAX_REPORTED = 40
 VAGUE_PHRASES = ("handle appropriately", "as expected", "user-friendly", "user friendly", "as appropriate", "tbd", "to be determined")
 _NUMBERING_RE = re.compile(r"^\s*(?:[0-9]+[.)]|[-*+])\s")
+
+# Ultra-lean lint (rules/story-writing-rules.md). Advisory except for the Gherkin rule and the one-statement rule.
+MIN_SUMMARY_WORDS = 2
+MAX_SUMMARY_WORDS = 7
+MAX_LEAN_CRITERION_WORDS = 70
+_GHERKIN_RE = re.compile(r"^\s*given\b.*\bwhen\b.*\bthen\b", re.IGNORECASE | re.DOTALL)
+_NON_FUNCTIONAL_RE = re.compile(
+    r"\b(?:performance|latency|throughput|availability|uptime|scalab\w*|concurren\w*|accessib\w*|response time|"
+    r"within\s+\d+(?:\.\d+)?\s*(?:ms|milliseconds?|seconds?)|\d+(?:\.\d+)?\s*(?:ms|milliseconds))",
+    re.IGNORECASE,
+)
+_ABBREVIATION_RE = re.compile(r"\b(?:e\.g|i\.e|etc|vs)\.", re.IGNORECASE)
+_SENTENCE_BREAK_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9\"'(])")
+
+
+def _sentence_count(text):
+    text = _ABBREVIATION_RE.sub(lambda m: m.group(0).replace(".", ""), text)
+    return len([part for part in _SENTENCE_BREAK_RE.split(" ".join(text.split())) if part.strip()])
+
+
+def lean_warnings(label, summary, criteria):
+    """Advisory warnings for an ultra-lean story that is longer or less functional than the standard asks."""
+    found = []
+    words = len(summary.split())
+    if _sentence_count(summary) > 1 or words > MAX_SUMMARY_WORDS:
+        found.append(f"{label}: the summary is not concise ({words} words); use a concise label (typically 3-{MAX_SUMMARY_WORDS} words) of the core capability and leave detail to the acceptance criteria.")
+    elif words < MIN_SUMMARY_WORDS:
+        found.append(f"{label}: the summary is too vague ({words} word); use a concise label (typically 3-{MAX_SUMMARY_WORDS} words) that identifies the core capability.")
+    if len(criteria) > 1:
+        found.append(f"{label}: the acceptance criteria are a list of {len(criteria)} items; combine them into one statement.")
+    for item in criteria:
+        if len(item.split()) > MAX_LEAN_CRITERION_WORDS:
+            found.append(f"{label}: the acceptance criteria statement is long ({len(item.split())} words); keep the essential functional outcomes and rules and leave scenarios to the detailed story.")
+        if _NON_FUNCTIONAL_RE.search(item):
+            found.append(f"{label}: the acceptance criteria statement looks like a non-functional requirement; non-functional detail belongs in the detailed story only.")
+    return found
+
+
+def gherkin_criteria(criteria):
+    return [number for number, item in enumerate(criteria, start=1) if _GHERKIN_RE.match(item)]
 
 
 class InputError(Exception):
@@ -74,17 +119,38 @@ def _check_keys(obj, allowed, required, label, errors):
         )
 
 
-def _roundtrip_error(story):
-    probe = {
-        "story_id": "US-001",
-        "summary": story["summary"],
-        "description": story["description"],
-        "acceptance_criteria": story["acceptance_criteria"],
-    }
-    stories, problems = common.parse_section(common.render_section([common.render_story(probe)]))
+def _check_text_list(items, label, name, errors, required, check_numbering=True):
+    """Validate an array of plain-text items. Returns True when it is usable."""
+    if not isinstance(items, list) or (required and not items):
+        errors.append(f"{label}: '{name}' must be {'a non-empty' if required else 'an'} array of strings.")
+        return False
+    usable = True
+    for number, item in enumerate(items, start=1):
+        if not _is_text(item):
+            errors.append(f"{label}: {name} item {number} must be a non-empty string.")
+            usable = False
+        elif check_numbering and _NUMBERING_RE.match(item):
+            errors.append(f"{label}: {name} item {number} starts with its own numbering or bullet; numbering and bullets are added when the story is written.")
+            usable = False
+    return usable
+
+
+def _roundtrip_lean_error(story):
+    probe = {"story_id": "US-001", "summary": story["summary"], "acceptance_criteria": story["acceptance_criteria"]}
+    stories, problems = common.parse_section(common.render_section([common.render_lean(probe)]))
     if problems or len(stories) != 1:
         return "; ".join(problems) or "the story does not parse back as one story"
-    if common.canonical_story(stories[0]) != common.canonical_story(probe):
+    if common.canonical_lean(stories[0]) != common.canonical_lean(probe):
+        return "the text does not survive being written as Markdown and read back"
+    return None
+
+
+def _roundtrip_detailed_error(story):
+    probe = dict(story, story_id="US-001")
+    stories, problems = common.parse_detailed_document(common.render_detailed_document([common.render_detailed(probe)]))
+    if problems or len(stories) != 1:
+        return "; ".join(problems) or "the story does not parse back as one story"
+    if common.canonical_detailed(stories[0]) != common.canonical_detailed(probe):
         return "the text does not survive being written as Markdown and read back"
     return None
 
@@ -108,7 +174,6 @@ def validate_draft(draft, requirements, register):
     seen_ids = {}
     seen_summary, seen_description, seen_criteria = {}, {}, {}
     covered = set()
-    valid_stories = []
 
     for position, story in enumerate(stories, start=1):
         label = f"Story {position}"
@@ -118,8 +183,8 @@ def validate_draft(draft, requirements, register):
         story_id = story.get("story_id")
         if isinstance(story_id, str):
             label = f"Story {position} ({story_id})"
-        _check_keys(story, STORY_KEYS, STORY_REQUIRED, label, errors)
         before = len(errors)
+        _check_keys(story, STORY_KEYS, STORY_REQUIRED, label, errors)
 
         if story_id is not None:
             if not isinstance(story_id, str) or not common.STORY_ID_RE.match(story_id):
@@ -129,20 +194,42 @@ def validate_draft(draft, requirements, register):
             else:
                 seen_ids[story_id] = position
 
-        summary, description, criteria = story.get("summary"), story.get("description"), story.get("acceptance_criteria")
-        if "summary" in story and not _is_text(summary):
-            errors.append(f"{label}: 'summary' must be a non-empty string.")
-        if "description" in story and not _is_text(description):
-            errors.append(f"{label}: 'description' must be a non-empty string.")
-        if "acceptance_criteria" in story:
-            if not isinstance(criteria, list) or not criteria:
-                errors.append(f"{label}: 'acceptance_criteria' must be a non-empty array of strings.")
+        summary = story.get("summary")
+        if "summary" in story:
+            if not _is_text(summary):
+                errors.append(f"{label}: 'summary' must be a non-empty string.")
+            elif "\n" in summary or "\r" in summary:
+                errors.append(f"{label}: 'summary' must be a single line.")
+
+        lean_criteria = story.get("lean_acceptance_criteria")
+        if "lean_acceptance_criteria" in story:
+            if _check_text_list(lean_criteria, label, "lean criterion", errors, required=True):
+                if len(lean_criteria) != 1:
+                    errors.append(
+                        f"{label}: 'lean_acceptance_criteria' must hold exactly one statement ({len(lean_criteria)} given); "
+                        "combine the essential functional outcomes and business rules into a single statement."
+                    )
+                for number in gherkin_criteria(lean_criteria):
+                    errors.append(
+                        f"{label}: lean criterion {number} is a Given/When/Then scenario. The lean acceptance criteria are one concise statement "
+                        "of the observable functional outcome; scenarios belong in the detailed story."
+                    )
+
+        detail = story.get("detailed")
+        canon_detail = None
+        if "detailed" in story:
+            if not isinstance(detail, dict):
+                errors.append(f"{label}: 'detailed' must be an object with the detailed story fields.")
             else:
-                for number, item in enumerate(criteria, start=1):
-                    if not _is_text(item):
-                        errors.append(f"{label}: acceptance criterion {number} must be a non-empty string.")
-                    elif _NUMBERING_RE.match(item):
-                        errors.append(f"{label}: acceptance criterion {number} starts with its own numbering or bullet; numbering is added when the story is written.")
+                _check_keys(detail, common.DETAILED_KEYS, DETAILED_REQUIRED, f"{label} detailed", errors)
+                if "description" in detail and not _is_text(detail["description"]):
+                    errors.append(f"{label}: detailed 'description' must be a non-empty string.")
+                for key in common.DETAILED_LIST_KEYS:
+                    if key in detail:
+                        _check_text_list(detail[key], label, f"detailed {key}", errors, required=key in DETAILED_REQUIRED)
+
+        if "lean_reviewed" in story and not isinstance(story["lean_reviewed"], bool):
+            errors.append(f"{label}: 'lean_reviewed' must be true or false.")
 
         sources = story.get("source_requirement_ids")
         if "source_requirement_ids" in story:
@@ -184,36 +271,47 @@ def validate_draft(draft, requirements, register):
                 elif gap_id not in related:
                     errors.append(f"{label}: {gap_id} does not affect any requirement this story is built from.")
 
-        if len(errors) == before and isinstance(criteria, list):
-            canon = common.canonical_story(story)
-            problem = _roundtrip_error(story)
-            if problem:
-                errors.append(f"{label}: cannot be written as readable Markdown: {problem}")
-            key = canon["summary"].casefold()
-            if key in seen_summary:
-                errors.append(f"{label}: summary duplicates story {seen_summary[key]}; merge them or make each state a different capability.")
-            else:
-                seen_summary[key] = position
-            key = canon["description"].casefold()
-            if key in seen_description:
-                errors.append(f"{label}: description duplicates story {seen_description[key]}.")
-            else:
-                seen_description[key] = position
-            folded = [c.casefold() for c in canon["acceptance_criteria"]]
+        if len(errors) != before:
+            continue
+
+        lean_story = common.lean_view(story)
+        full_story = common.detailed_view(story)
+        canon_lean = common.canonical_lean(lean_story)
+        canon_detail = common.canonical_detailed(full_story)
+        problem = _roundtrip_lean_error(lean_story)
+        if problem:
+            errors.append(f"{label}: the lean story cannot be written as readable Markdown: {problem}")
+        problem = _roundtrip_detailed_error(full_story)
+        if problem:
+            errors.append(f"{label}: the detailed story cannot be written as readable Markdown: {problem}")
+        for name, items in (("lean criteria", canon_lean["acceptance_criteria"]), ("detailed acceptance criteria", canon_detail["acceptance_criteria"])):
+            folded = [c.casefold() for c in items]
             if len(set(folded)) != len(folded):
-                errors.append(f"{label}: duplicate acceptance criteria.")
-            key = frozenset(folded)
-            if key in seen_criteria:
-                errors.append(f"{label}: acceptance criteria are identical to story {seen_criteria[key]}.")
-            else:
-                seen_criteria[key] = position
-            text = " ".join([canon["summary"], canon["description"]] + canon["acceptance_criteria"]).lower()
-            for phrase in VAGUE_PHRASES:
-                if phrase in text:
-                    warnings.append(f"{label}: contains the vague phrase '{phrase}'; make it measurable or remove it.")
-            if not re.search(r"\bas an?\b", canon["description"], re.IGNORECASE):
-                warnings.append(f"{label}: the description does not use the 'As a ..., I want ..., so that ...' form; use a neutral formulation only when the actor or value is unclear.")
-            valid_stories.append(story)
+                errors.append(f"{label}: duplicate {name}.")
+        key = canon_lean["summary"].casefold()
+        if key in seen_summary:
+            errors.append(f"{label}: summary duplicates story {seen_summary[key]}; merge them or make each state a different capability.")
+        else:
+            seen_summary[key] = position
+        key = canon_detail["description"].casefold()
+        if key in seen_description:
+            errors.append(f"{label}: detailed description duplicates story {seen_description[key]}.")
+        else:
+            seen_description[key] = position
+        key = frozenset(c.casefold() for c in canon_lean["acceptance_criteria"])
+        if key in seen_criteria:
+            errors.append(f"{label}: lean criteria are identical to story {seen_criteria[key]}.")
+        else:
+            seen_criteria[key] = position
+        text = " ".join([canon_lean["summary"], canon_detail["description"]] + canon_lean["acceptance_criteria"] + canon_detail["acceptance_criteria"]
+                        + canon_detail["functional_behaviour"] + canon_detail["business_rules"] + canon_detail["scenarios"]
+                        + canon_detail["non_functional_requirements"]).lower()
+        for phrase in VAGUE_PHRASES:
+            if phrase in text:
+                warnings.append(f"{label}: contains the vague phrase '{phrase}'; make it measurable or remove it.")
+        if not re.search(r"\bas an?\b", canon_detail["description"], re.IGNORECASE):
+            warnings.append(f"{label}: the detailed description does not use the 'As a ..., I want ..., so that ...' form; use a neutral formulation only when the actor or value is unclear.")
+        warnings.extend(lean_warnings(label, canon_lean["summary"], canon_lean["acceptance_criteria"]))
 
     not_covered = draft.get("not_covered_requirements", [])
     listed = set()
@@ -272,14 +370,23 @@ def validate_draft(draft, requirements, register):
 
 
 def validate_managed_section(stories, problems, requirements, state=None):
-    """Validate stories parsed from a document. Returns (errors, warnings)."""
+    """Validate the ultra-lean stories parsed from a document. Returns (errors, warnings)."""
     errors = list(problems)
     warnings = []
     for story in stories:
-        text = " ".join([story["summary"], story["description"]] + story["acceptance_criteria"]).lower()
+        if story.get("legacy"):
+            errors.append(
+                f"{story['story_id']}: uses the layout of an earlier plugin version (Summary and Detailed Description fields). "
+                "Run /ba-requirements:generate-stories to rewrite it as an ultra-lean story with a detailed story in stories/detailed_stories.md."
+            )
+            continue
+        text = " ".join([story["summary"]] + story["acceptance_criteria"]).lower()
         for phrase in VAGUE_PHRASES:
             if phrase in text:
                 warnings.append(f"{story['story_id']}: contains the vague phrase '{phrase}'.")
+        warnings.extend(lean_warnings(story["story_id"], story["summary"], story["acceptance_criteria"]))
+        for number in gherkin_criteria(story["acceptance_criteria"]):
+            warnings.append(f"{story['story_id']}: lean criterion {number} is a Given/When/Then scenario; the lean acceptance criteria are one concise statement.")
     if state:
         in_doc = {s["story_id"] for s in stories}
         in_state = {s["story_id"] for s in state["stories"]}
@@ -293,6 +400,48 @@ def validate_managed_section(stories, problems, requirements, state=None):
                     if req_id not in requirements:
                         warnings.append(f"{entry['story_id']}: source requirement {req_id} no longer exists in the atomic requirements.")
     return errors, warnings
+
+
+def validate_story_set(doc_stories, doc_problems, detailed, requirements, state=None, legacy_files=None):
+    """Validate the ultra-lean stories of the document together with stories/detailed_stories.md.
+
+    detailed is a story_common.DetailedFile. Returns (errors, warnings, status). Errors are structural:
+    a story without a detailed story, a detailed story without a lean story, an invalid file, differing
+    summaries. Hash divergence (a version edited since the last synchronisation) is reported as warnings
+    and in the returned pair status.
+    """
+    errors, warnings = validate_managed_section(doc_stories, doc_problems, requirements, state)
+    errors.extend(detailed.problems)
+    status = common.pair_status(doc_stories, detailed.stories, state)
+    if not detailed.exists:
+        if doc_stories:
+            errors.append(f"{common.DETAILED_RELATIVE} does not exist; every story needs its detailed story in that single file.")
+    else:
+        for story_id in status["detailed_missing"]:
+            errors.append(f"{story_id}: there is no detailed story in {common.DETAILED_RELATIVE}.")
+        for story_id in status["detailed_extra"]:
+            errors.append(f"{story_id}: {common.DETAILED_RELATIVE} has a detailed story but the document has no matching story.")
+    for name in legacy_files or []:
+        warnings.append(f"{name} was written by an earlier plugin version and is no longer used; all detailed stories are in {common.DETAILED_RELATIVE}. Remove it once you have checked nothing is missing.")
+    for story in doc_stories:
+        story_id = story["story_id"]
+        full = detailed.stories.get(story_id)
+        if full is None or story.get("legacy"):
+            continue
+        if common.collapse(story["summary"]).casefold() != common.collapse(full["summary"]).casefold():
+            errors.append(f"{story_id}: the summary differs between the requirements document and the detailed story.")
+        text = " ".join([full["summary"], full["description"]] + full["functional_behaviour"] + full["business_rules"]
+                        + full["acceptance_criteria"] + full["scenarios"] + full["non_functional_requirements"]).lower()
+        warnings.extend(f"{story_id}: the detailed story contains the vague phrase '{phrase}'." for phrase in VAGUE_PHRASES if phrase in text)
+    for story_id in status["lean_edited"]:
+        warnings.append(f"{story_id}: the story in the requirements document was edited since the last synchronisation.")
+    for story_id in status["detailed_edited"]:
+        warnings.append(f"{story_id}: the detailed story was edited since the last synchronisation.")
+    for story_id in status["lean_stale"]:
+        warnings.append(f"{story_id}: the detailed story changed after its lean story was written; update the lean story from it.")
+    for story_id in status["detailed_untracked"]:
+        warnings.append(f"{story_id}: the story state has no record of this detailed story yet.")
+    return errors, warnings, status
 
 
 def _read_json(path):
@@ -309,7 +458,7 @@ def _read_json(path):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Validate development stories.")
     parser.add_argument("draft", nargs="?", help="Path to the structured draft JSON, or - for standard input.")
-    parser.add_argument("--document", help="Validate the managed section of this Markdown document instead.")
+    parser.add_argument("--document", help="Validate the managed section of this Markdown document (and the detailed stories file) instead.")
     parser.add_argument("--project-root", default=os.getcwd())
     parser.add_argument("--requirements")
     parser.add_argument("--gaps")
@@ -344,8 +493,10 @@ def main(argv=None):
                 print(f"FAILED: {args.document} has no '# {common.SECTION_TITLE}' section.", file=sys.stderr)
                 return 1
             state, _, _ = common.load_state(paths)
-            errors, warnings = validate_managed_section(doc.stories, doc.problems, requirements, state)
-            subject = f"{len(doc.stories)} story(ies) in the managed section"
+            errors, warnings, _ = validate_story_set(
+                doc.stories, doc.problems, common.scan_detailed(paths), requirements, state, common.scan_legacy_files(paths)
+            )
+            subject = f"{len(doc.stories)} ultra-lean story(ies) in the managed section and their detailed stories in {common.DETAILED_RELATIVE}"
         else:
             draft = _read_json(args.draft)
             gaps = common.load_gaps(paths, requirements, ignore=args.no_gaps)
@@ -355,7 +506,7 @@ def main(argv=None):
                     print(f"  - {message}", file=sys.stderr)
                 return 1
             errors, warnings = validate_draft(draft, requirements, gaps["register"])
-            subject = f"{len(draft.get('stories', [])) if isinstance(draft, dict) else 0} draft story(ies)"
+            subject = f"{len(draft.get('stories', [])) if isinstance(draft, dict) and isinstance(draft.get('stories'), list) else 0} draft story(ies)"
     except common.Refused as exc:
         print(f"FAILED: {exc}", file=sys.stderr)
         return 1

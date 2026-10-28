@@ -1,36 +1,67 @@
 # Story Writing Rules
 
-## Four fields, nothing else
+## Two representations of every story
 
-Every story in the `# Development Stories` section has exactly:
+Every story is written twice under one stable Story ID:
+
+| Representation | Where | Role |
+|---|---|---|
+| **Detailed story** | `stories/detailed_stories.md`: one consolidated Markdown file holding every story | The complete, implementation-ready story: functional behaviour, business rules, testable acceptance criteria, scenarios and non-functional requirements. The HTML report is built from it. |
+| **Ultra-lean story** | The `# Development Stories` section of the user's requirements document | A high-level, functional-oriented summary that keeps the requirements document short. Always derived from the detailed story. |
+
+The ultra-lean story is a shortening of the detailed story, never a different story. Write the detailed story first, then derive the ultra-lean one. When a detailed story changes, its ultra-lean story is updated from it. Never create a separate Markdown file per story.
+
+## The ultra-lean story (requirements document)
+
+Exactly three things, nothing else:
 
 | Field | Content |
 |---|---|
-| Story ID | `US-001` style, assigned by `scripts/sync-development-stories.py` |
-| Summary | One concise line naming the capability or outcome |
-| Detailed Description | The user need and expected capability, in the user-story form where it fits |
-| Acceptance Criteria | Observable, testable conditions (see `acceptance-criteria-rules.md`) |
+| Story ID | `US-001` style, assigned by `scripts/sync-development-stories.py`; identical in both representations |
+| Summary | A concise, meaningful one-line label of the story's core capability, typically 3-7 words (for example "Registered user login"); understandable at a glance, not a full sentence; **identical** in both representations |
+| Acceptance criteria | **One** concise statement covering all essential, confirmed **functional** outcomes and business rules |
 
-Never add source requirement IDs, gap IDs or statuses, priority, decisions, story status, owner, tags or any other metadata to a story. Requirement-to-story and gap-to-story mappings live only in `stories/story-generation-state.json`; gaps and decisions are shown in the HTML report, in their own sections.
-
-## Format
+Format (the scripts write it; you supply plain text):
 
 ```markdown
-## US-001
+## US-001 — Registered user login
 
-**Summary:** <one line>
-
-**Detailed Description:**
-As a <actor>, I want <capability> so that <outcome>.
-
-**Acceptance Criteria:**
-
-1. <criterion>
-
-2. <criterion>
+**Acceptance Criteria:** The system authenticates registered users with valid credentials, rejects invalid credentials with the defined error response, and grants access only after successful authentication.
 ```
 
-The scripts write this layout. You supply plain text only: no numbering, no headings, no `**Label:**` lines, and no leading `#` inside a field.
+Rules:
+
+1. Keep the summary concise but descriptive (typically 3-7 words): a label of the core capability, neither a vague word nor a full explanatory sentence.
+2. The criteria are **one statement**, not several bullets, scenarios or **Given/When/Then** (the validator rejects Gherkin and more than one statement). They describe what the system must do, not how it is implemented, and are specific, observable and testable.
+3. Combine the essential functional behaviour and the key business rules into that one statement. Never omit a confirmed functional rule merely to shorten the story, and never invent behaviour.
+4. Exclude detailed scenarios, implementation notes, technical design and every non-functional criterion (performance, availability, accessibility, security targets and so on). Those live only in the detailed story.
+5. No description, no preconditions, no metadata of any kind. Requirement IDs, gap IDs, decisions, priorities and statuses never appear in a story.
+
+## The detailed story (`stories/detailed_stories.md`)
+
+The file holds one section per story, in Story ID order. Every story has the same fields, in this order, and every field is always present (an empty optional field reads `Not specified.`):
+
+| Field | Content | Required |
+|---|---|---|
+| Heading | `## US-001 — <the same short summary>` | yes |
+| Description | The user need as `As a [user], I want [capability], so that [benefit].` | yes |
+| Preconditions | What must be true before the story applies | no |
+| Functional Behaviour | The detailed behaviour the system must provide | yes |
+| Business Rules | Rules, limits and constraints with their exact values | no |
+| Acceptance Criteria | Complete, independently testable Given/When/Then criteria (see `acceptance-criteria-rules.md`) | yes |
+| Alternate and Error Scenarios | Relevant alternate and error flows | no |
+| Non-Functional Requirements | Applicable quality attributes with measurable targets | no |
+| Dependencies | Other stories, systems, data or decisions the story depends on | no |
+
+Rules:
+
+1. Include only details supported by the atomic requirements and by the latest decision of a resolved gap. Never invent an answer for an unresolved gap, and never add placeholders, "TBD" or open questions.
+2. Keep functional and non-functional requirements with the story they belong to. A non-functional requirement that constrains one story goes in that story's Non-Functional Requirements; one that applies to several is stated in each of them.
+3. A purely technical or system requirement that no functional story carries becomes a system story ("As the system, I must ..."). Its ultra-lean criteria state only the observable outcome of the capability; the measurable quality targets stay in its detailed Non-Functional Requirements.
+4. Do not copy requirement IDs, gap IDs or decision metadata into the story text. Say what the rule is, not where it came from.
+5. Preserve conditions, limits and values exactly as the requirements and decisions state them.
+
+The draft format that carries both representations is in `schemas/development-stories.schema.json` and `skills/story-generation/SKILL.md`. Supply plain text only: no numbering, no bullets, no headings and no `**Label:**` lines inside a field.
 
 ## Decomposition
 
@@ -38,7 +69,7 @@ The scripts write this layout. You supply plain text only: no numbering, no head
 2. Group closely related requirements into one story when they describe one cohesive user outcome.
 3. Split requirements that are independently deliverable capabilities.
 4. Do not generate one story per requirement mechanically. A story is neither too broad to implement and test, nor so small that it has no meaningful outcome of its own.
-5. Keep business rules and constraints. Express technical or system constraints as a technical or system story (for example "As the system, I must ...") rather than dropping them.
+5. Keep business rules and constraints. Express technical or system constraints as non-functional requirements of the story they constrain, or as a system story, rather than dropping them.
 6. One requirement may appear in several stories when they cover different capabilities; one story may draw on several requirements.
 7. Do not write two stories for the same capability.
 8. Every atomic requirement ends up in at least one story, or is listed in `not_covered_requirements` with a reason. Silence is not an option.
@@ -47,15 +78,14 @@ The scripts write this layout. You supply plain text only: no numbering, no head
 
 1. Actor: use the actor named in the requirements; an administrator or the system where that is what the requirement describes. Do not invent a persona.
 2. Value ("so that ..."): use only a value the requirements support. If the actor or value is unclear, use a neutral, accurate formulation instead of guessing.
-3. Preserve conditions, limits and constraints exactly as the requirement states them.
-4. Be precise. Avoid "handle appropriately", "as expected", "user-friendly", "as appropriate", "TBD" unless the requirements make the term measurable.
-5. No implementation detail the requirements do not state (technologies, screens, tables, endpoints).
-6. A story must be understandable without opening the source requirement.
+3. Be precise. Avoid "handle appropriately", "as expected", "user-friendly", "as appropriate", "TBD" unless the requirements make the term measurable.
+4. No implementation detail the requirements do not state (technologies, screens, tables, endpoints).
+5. A story must be understandable without opening the source requirement.
 
 ## Unresolved gaps
 
-1. Open and skipped gaps never block a story.
+1. An open or skipped gap is not a decision and never changes a story's text. (Whether story generation may start at all is decided by the story-generation gate in `story-management-rules.md`.)
 2. Write only what the requirements and resolved decisions support. Do not choose an answer, and do not turn a plausible answer into a rule.
 3. If an unresolved decision prevents one behaviour from being specified, leave that behaviour out. Do not add a placeholder criterion, a "TBD" or a question to the story.
-4. If an unresolved gap stops the whole story from being meaningfully defined, keep the known capability, say plainly in the description what is not yet defined, and write no invented criteria.
+4. If an unresolved gap stops the whole story from being meaningfully defined, keep the known capability, say plainly in the detailed description what is not yet defined, and write no invented criteria.
 5. Only a resolved gap's latest recorded decision is a confirmed business decision. A skipped gap is never a decision.

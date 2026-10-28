@@ -226,7 +226,7 @@ Follow `generate-stories.md` Steps 1–8 with these hand-offs:
 - **Target document.** If the confirmed source in Step 2 is a single `.md` file, use it as `--target`. If several files were confirmed, ask the user to select the single primary document that holds the `# Development Stories` section (Step 3 of that file). If `inspect` already shows a recorded target, reuse it and do not ask again. Never add the section to several files.
 - **Gap register.** The register was validated in Phase 2, so pass no `--ignore-gaps`. If the register has become invalid or unreadable, stop the pipeline (Step 9); do not continue without gap context from this command. The user can run `/ba-requirements:generate-stories` on its own to make that choice explicitly.
 - **Only open or skipped Medium and Low gaps can remain at this point, and they do not block story generation.** Generate stories from the validated atomic requirements and the resolved decisions. Never decide an open or skipped gap and never invent answers or acceptance criteria.
-- **Story contract.** Each story in the document holds exactly four fields: Story ID, Summary, Detailed Description, Acceptance Criteria. Requirement-to-story and gap-to-story mappings stay in `stories/story-generation-state.json` only. `validate-development-stories.py` enforces this; treat its failure as a gate failure.
+- **Story contract.** Each story exists twice under one Story ID: a detailed functional and non-functional story in the single consolidated file `stories/detailed_stories.md` (authoritative; the report is built from it; never one file per story) and an ultra-lean story in the document's `# Development Stories` section holding only Story ID, concise summary and one functional acceptance-criteria statement. Requirement-to-story and gap-to-story mappings, hashes and synchronisation metadata stay in `stories/story-generation-state.json` only. `validate-development-stories.py` enforces this and checks that every story in the document has a matching Story ID and summary in `detailed_stories.md`; treat its failure as a gate failure.
 - **Safe update.** Keep using the dry-run, conflict, `--expected-source-sha256`, backup and read-back protections. If the managed section or a story was edited by hand, the conflict process in the phase file asks the user before anything is changed. Existing story IDs and unrelated content are preserved.
 - If the stories already cover all requirements and nothing changed, report that and keep the existing section untouched (Step 4 of that file), then continue to enrichment.
 
@@ -286,7 +286,8 @@ Validation:
 Artifacts:
 - atomic_requirements/atomic_requirements.json
 - gaps/gaps.json, gaps/gap-analysis.html
-- <target document> (Development Stories section; backup: <path>)
+- stories/detailed_stories.md (all detailed functional and non-functional stories)
+- <target document> (ultra-lean Development Stories section; backup: <path>)
 - stories/story-generation-state.json
 - HTML report: <project root>/report/phase3-report.html — <GENERATED <timestamp> | STALE: <reason> | UNAVAILABLE: <reason>>
 

@@ -32,17 +32,17 @@ Read these files from the plugin root, in full, and follow them:
 ## Responsibilities
 
 - Read every atomic requirement, then decide the stories by business capability. Do not produce one story per requirement mechanically.
-- Write each story's summary, description and testable acceptance criteria. Preserve conditions and constraints. Use neutral wording where the actor or value is unclear.
+- Write every story twice under one ID. First the **detailed story** (saved with all other detailed stories in the single file `stories/detailed_stories.md`; the draft's `detailed` object): the user need, preconditions, detailed functional behaviour, business rules, complete independently testable Given/When/Then criteria, alternate and error scenarios, the applicable non-functional requirements with their measurable targets, and dependencies, each only as far as the requirements and confirmed decisions support. Then the **ultra-lean story** (saved in the requirements document), derived from it: a concise `summary` (typically 3-7 words naming the core capability) and `lean_acceptance_criteria`, an array holding exactly one concise statement that covers all essential functional outcomes and key business rules. The lean criteria are not several bullets, not Given/When/Then and contain no implementation detail, detailed scenarios or non-functional criteria. Preserve conditions and constraints; never drop a confirmed functional rule to shorten a story, and never let the ultra-lean story contradict the detailed one. Use neutral wording where the actor or value is unclear.
 - Map every story to its source requirement IDs. Account for every requirement: in a story, or in `not_covered_requirements` with a reason.
 - Use the gap register to know what is confirmed. Only a resolved gap's latest decision is a confirmed decision. Open and skipped gaps never become criteria.
-- In `reconcile` and `enrich` modes keep existing stories exactly as they are unless a change is needed, keep their IDs, and leave stories edited by hand untouched (propose changes instead).
+- In `reconcile` and `enrich` modes keep existing stories exactly as they are unless a change is needed, keep their IDs, and leave stories edited by hand (the detailed story or the entry in the requirements document) untouched (propose changes instead). When a detailed story changes, update its ultra-lean story from it and set `lean_reviewed: true`; do the same for a story the export flags `lean_needs_update` once the user has agreed.
 
 ## Constraints
 
 - Never invent a business decision, rule, actor or value. Never turn a plausible answer to an open gap into a requirement.
-- Stories carry only summary, description and acceptance criteria. No requirement IDs, gap IDs, statuses, priorities or other metadata inside a story's text. The mapping keys (`source_requirement_ids`, `applied_decisions`) are for the internal state only.
+- The requirements document gets only Story ID, a concise summary and one functional acceptance-criteria statement. The detailed story has only the fields of the `detailed` object. No requirement IDs, gap IDs, statuses, priorities or other metadata inside any story's text, and never one Markdown file per story. The mapping keys (`source_requirement_ids`, `applied_decisions`) are for the internal state only.
 - New stories have `story_id: null`. Never assign or reuse an ID.
-- Never modify the atomic requirements, the gap register, the requirements document, the story state or the report. Write only the draft file at the draft path.
+- Never modify the atomic requirements, the gap register, the requirements document, `stories/detailed_stories.md`, the story state or the report. Write only the draft file at the draft path.
 - Do not create a story silently for a resolved decision whose relationship to the existing stories is uncertain; propose it.
 - You cannot ask the user anything. When you cannot decide, report it under `NEEDS_DECISION` instead of guessing.
 
@@ -52,10 +52,10 @@ Read these files from the plugin root, in full, and follow them:
 2. Draft the story set for your mode.
    - `generate`: the full set for all requirements.
    - `reconcile`: the exported stories unchanged, plus new stories for uncovered requirements, plus the minimal updates required by changed requirements.
-   - `enrich`: the exported stories unchanged, except the stories materially affected by each pending decision.
+   - `enrich`: the exported stories unchanged, except the stories materially affected by each pending decision. Change the detailed story first (only the affected field or criterion), merge the decision into an existing item where it fits, keep the ID, summary and unrelated criteria, never duplicate a rule already stated, and then update the ultra-lean story from it when a high-level functional outcome changes.
 3. Write the draft JSON (two-space indentation, UTF-8) to the draft path in the format given in the story-generation skill.
 4. Run `scripts/validate-development-stories.py <draft> --project-root <project root>` from the plugin root (add `--no-gaps` when gap context was ignored; try `python`, then `python3`, then `py`). Fix and re-run until it passes. If Python is unavailable, stop and report it; do not install anything.
-5. Review your own draft against the semantic checklist: each story is one coherent capability; criteria are testable; no unresolved decision became an assumption; confirmed decisions are reflected accurately and only where they apply; scope is right; nothing contradicts anything else; nothing is duplicated.
+5. Review your own draft against the semantic checklist: each story is one coherent capability; the detailed story is complete (functional behaviour, rules, testable criteria, scenarios) and supported by the requirements and confirmed decisions; applicable non-functional requirements sit in the story they constrain; the ultra-lean summary is a concise 3-7 word label and the lean criteria are one statement that is high-level, functional and free of bullets, Given/When/Then, scenarios and non-functional criteria; the ultra-lean story agrees with the detailed one and omits no confirmed functional rule; criteria are testable with a clear expected outcome; no unresolved decision became an assumption; confirmed decisions are reflected accurately and only where they apply; no unsupported behaviour was introduced; scope is right; nothing contradicts anything else; nothing is duplicated. Treat the validator's warnings as prompts, and keep the detail when shortening would lose a confirmed rule.
 
 ## Final response format
 
@@ -67,7 +67,7 @@ MODE: generate | reconcile | enrich
 DRAFT: <draft path>
 VALIDATOR: PASSED | FAILED
 REQUIREMENTS ANALYSED: <count>
-STORIES IN DRAFT: <count> (new <n>, changed <n>, unchanged <n>)
+STORIES IN DRAFT: <count> (new <n>, changed <n>, unchanged <n>); ultra-lean versions re-derived or confirmed: <n>
 REQUIREMENTS NOT COVERED:
 - REQ-0xx: <reason>
 GAP HANDLING:

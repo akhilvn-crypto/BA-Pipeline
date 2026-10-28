@@ -27,8 +27,8 @@ It guides you through the whole flow and asks before it overwrites anything:
 | 2. Phase 1: atomic requirements | Splits the requirements into atomic, traceable `REQ-xxx` items, validated and saved. | Nothing. |
 | 3. Phase 2: gap analysis | Finds missing, ambiguous or conflicting information, prioritises it (Critical to Low) and builds the gap register and dashboard. | Nothing. |
 | 4. Phase 2: triage | Shows gaps one at a time, Critical first. Every Critical and High gap must be resolved before stories are generated; if any is left open or skipped, you are returned to triage for those gaps. Medium and Low gaps may stay open. | Give a decision, skip the gap, skip all, or stop (progress is saved). |
-| 5. Phase 3: stories | Appends a `# Development Stories` section to your requirements document, then enriches only the stories your decisions affect. | Pick the target document if there are several; confirm the preview. |
-| 6. Report | Writes `report/phase3-report.html` and prints a summary with real counts. | Open the report in a browser. |
+| 5. Phase 3: stories | Writes every story twice under one ID: a detailed functional and non-functional story in the single file `stories/detailed_stories.md` and an ultra-lean story (ID, concise summary, one functional criteria statement) in a `# Development Stories` section of your requirements document. Then enriches only the stories your decisions affect. | Pick the target document if there are several; confirm the preview. |
+| 6. Report | Writes `report/phase3-report.html` from `stories/detailed_stories.md` and prints a summary with real counts. | Open the report in a browser. |
 
 **Resume at any time.** `/ba-requirements:run` records a checkpoint after every operation (in `.ba-requirements/pipeline-state.json`). Run it again after an interruption and it shows the last completed operation and asks whether to **Resume** or **Start a new run**. A resume re-checks what was completed, skips what is still valid and continues from the first incomplete or invalid operation; stories keep their IDs and answered gaps stay answered. Edit your requirements, or settle skipped gaps later, and the affected operations (and the ones after them) are rerun.
 
@@ -49,18 +49,19 @@ Prefer to go step by step? Every phase is also a standalone command, see below.
 
 ```text
 <your-project>/
-├── <your requirements>.md      original content untouched; '# Development Stories' appended (the only part written)
+├── <your requirements>.md      original content untouched; ultra-lean '# Development Stories' appended (the only part written)
 ├── atomic_requirements/        atomic_requirements.json
 ├── gaps/                       gaps.json (register), gap-analysis.html (dashboard)
-├── stories/                    story-generation-state.json, backups/
-└── report/                     phase3-report.html (offline, read-only)
+├── stories/                    detailed_stories.md (all detailed stories, one file),
+│                               story-generation-state.json, backups/
+└── report/                     phase3-report.html (offline, read-only, built from detailed_stories.md)
 ```
 
 ## Overview
 
 - **Phase 1** reads Markdown requirement documents, decomposes them into atomic requirements, validates the result and saves it as JSON in your project.
 - **Phase 2** analyses those atomic requirements for gaps, prioritises them, keeps a JSON gap register and an HTML dashboard, and guides you through triaging the gaps one at a time.
-- **Phase 3** writes development stories into a `# Development Stories` section at the end of your original Markdown requirements document, enriches only the affected stories when gaps are resolved, detects and reconciles manual edits, and keeps a consolidated HTML report of stories, gaps and business decisions.
+- **Phase 3** keeps two representations of every development story under one stable ID: a **detailed story** in the single consolidated file `stories/detailed_stories.md` (functional behaviour, business rules, testable criteria and non-functional requirements; authoritative) and an **ultra-lean story** in a `# Development Stories` section at the end of your original Markdown requirements document (Story ID, concise summary and one functional acceptance-criteria statement only), which keeps that document concise. It enriches only the affected stories when gaps are resolved (detailed first, then ultra-lean), detects and reconciles manual edits to either version, and keeps a consolidated HTML report built from the detailed stories, with gaps and business decisions.
 
 Out of scope: Jira integration, story approval workflows, test cases, writing gap decisions back into the atomic requirements, and any change to your documents outside the `Development Stories` section or to `atomic_requirements.json`.
 
@@ -72,10 +73,10 @@ Out of scope: Jira integration, story approval workflows, test cases, writing ga
 | `/ba-requirements:start-analysis` | Phase 1. Decompose Markdown requirements into atomic requirements. |
 | `/ba-requirements:analyse-gaps` | Phase 2. Identify and prioritise gaps; create or reconcile the gap register and HTML report. |
 | `/ba-requirements:triage-gaps` | Phase 2. Review open and skipped gaps one at a time and record decisions. |
-| `/ba-requirements:generate-stories` | Phase 3. Generate development stories (open or skipped gaps do not block it). |
-| `/ba-requirements:enrich-stories` | Phase 3. Apply decisions from resolved gaps to the stories they affect. |
-| `/ba-requirements:sync-stories` | Phase 3. Detect and reconcile manual changes to the stories section and its mappings. |
-| `/ba-requirements:generate-report` | Phase 3. Rebuild the HTML report only; no story changes. |
+| `/ba-requirements:generate-stories` | Phase 3. Generate the detailed stories (`stories/detailed_stories.md`) and the ultra-lean stories in the requirements document (open or skipped gaps do not block it). |
+| `/ba-requirements:enrich-stories` | Phase 3. Apply decisions from resolved gaps to the stories they affect: detailed story first, then its ultra-lean version. |
+| `/ba-requirements:sync-stories` | Phase 3. Detect and reconcile manual changes to the ultra-lean section, `stories/detailed_stories.md` and their mappings. |
+| `/ba-requirements:generate-report` | Phase 3. Rebuild the HTML report from `stories/detailed_stories.md` only; no story changes. |
 
 ## Master pipeline — `/ba-requirements:run`
 
@@ -86,7 +87,7 @@ One command for the whole workflow. It is an orchestration layer only: each phas
 2. **Phase 1.** Atomic requirements, validated and saved. A failure stops the pipeline.
 3. **Phase 2.** Gap analysis, saved register and gap report (validation gate), then interactive triage one gap at a time: give a decision, skip this gap, skip all remaining gaps, or stop (the pipeline pauses; every answer already given is saved and `/ba-requirements:run` resumes).
 4. **Story-generation gate.** Phase 3 starts only when every **Critical and High** gap is `resolved`. If any is open or skipped, including after "skip" or "skip all remaining", the pipeline names them and returns you to triage for those gaps; you can also exit and resume later. Medium and Low gaps may stay open or skipped and do not block.
-5. **Phase 3.** Stories are generated, then enriched using only the decisions of resolved gaps. Stories keep exactly four fields; mappings stay in `stories/story-generation-state.json`.
+5. **Phase 3.** Stories are generated (detailed and ultra-lean versions), then enriched using only the decisions of resolved gaps. The requirements document holds only Story ID, short summary and acceptance criteria; mappings, hashes and synchronisation metadata stay in `stories/story-generation-state.json`.
 6. Refreshes `report/phase3-report.html`. If that fails, the document and state stay valid, the previous report is kept, the run is recorded as stopped at the report (not completed), and the summary says the report is stale or unavailable; resuming reruns only the report.
 7. Runs a final validation, marks the run completed only if it succeeds, and prints a summary of actual counts and statuses (run ID, last completed, skipped and rerun operations, sources, requirements, gaps by priority and status, decisions, stories generated and enriched, validation per phase, report path and status, remaining follow-up).
 
@@ -210,7 +211,7 @@ Self-contained (no server, no external resources). Summary cards, priority distr
 
 ## Phase 3 — development stories
 
-Run Phase 1 first. Phase 2 is optional for the first generation: stories are written from the requirements as they stand, and open or skipped gaps never block them. A missing gap register only means gap traceability is unavailable.
+Run Phase 1 first. Phase 2 is optional for the standalone command: stories are written from the requirements as they stand and open or skipped gaps do not block it (`/ba-requirements:run` does gate on unresolved Critical and High gaps). A missing gap register only means gap traceability is unavailable.
 
 ```text
 /ba-requirements:generate-stories
@@ -224,73 +225,106 @@ Run Phase 1 first. Phase 2 is optional for the first generation: stories are wri
 
 1. Validates `atomic_requirements/atomic_requirements.json` (missing or invalid stops the command) and reads `gaps/gaps.json` if it exists. An invalid register: you either correct it or explicitly proceed without gap context.
 2. Asks which Markdown document should hold the stories. Phase 1 does not record the files it analysed, so this is asked once and remembered. For a folder with several files you select one primary document; stories are never appended to every file.
-3. The Story Generation Agent groups and splits the requirements by business capability and writes each story. It never decides an open gap or turns a possible answer into a criterion.
-4. The draft is validated, previewed, and written by `scripts/sync-development-stories.py`: manual edits and concurrent changes are detected, a backup is made, the document is written to a temporary file and replaced atomically, then read back and verified.
-5. The state is saved, the HTML report is generated, and the summary reports real counts.
+3. The Story Generation Agent groups and splits the requirements by business capability and writes each story twice: the detailed story first, then an ultra-lean version derived from it. It never decides an open gap or turns a possible answer into a criterion.
+4. The draft is validated, previewed, and written by `scripts/sync-development-stories.py`: manual edits to either version and concurrent changes are detected, backups are made, `detailed_stories.md` and the document are written to temporary files and replaced atomically, then read back and verified. If a write fails, everything is put back as it was.
+5. The state is saved, the HTML report is generated from `stories/detailed_stories.md`, and the summary reports real counts.
 
-Run it again at any time: existing stories are matched and keep their IDs; only requirements without stories get new ones; nothing is duplicated.
+Run it again at any time: existing stories are matched and keep their IDs; only requirements without stories get new ones; nothing is duplicated. A project created by an earlier plugin version (stories with Summary and Detailed Description fields, or one detailed file per story) is detected: the next run writes `stories/detailed_stories.md` and rewrites the entries in the ultra-lean form after you agree to replace them (IDs are kept; the document is backed up first).
 
 ### `/ba-requirements:enrich-stories`
 
-For each resolved gap whose latest decision has not been reviewed (new or revised), only the stories built from the affected requirements are considered. A story changes only if the decision changes its behaviour; IDs and unrelated criteria are kept; no criterion is duplicated. A decision that needs no story change is recorded as such (and still reaches the report). A resolved gap that was reopened never deletes criteria on its own: you choose to retain, revise or remove them. A decision that needs a new story is proposed to you, not created silently. Running it again with nothing new changes nothing.
+For each resolved gap whose latest decision has not been reviewed (new or revised), only the stories built from the affected requirements are considered. A story changes only if the decision changes its behaviour: the confirmed decision is applied to its detailed story first, and the ultra-lean story is then derived from the updated detailed story where a high-level functional outcome changes. IDs and unrelated criteria are kept; no criterion is duplicated. A decision that needs no story change is recorded as such (and still reaches the report). A resolved gap that was reopened never deletes criteria on its own: you choose to retain, revise or remove them. A decision that needs a new story is proposed to you, not created silently. Running it again with nothing new changes nothing.
 
 ### `/ba-requirements:sync-stories`
 
-Detects edited, added, deleted and re-numbered stories, edits elsewhere in the document, and requirement or gap-register changes. You choose what to accept; accepted edits are recorded in the story state without touching the document. Sections that break the story contract are reported and left for you to fix.
+Detects edited, added, deleted and re-numbered stories (in the document and in `stories/detailed_stories.md`), edits elsewhere in the document, and requirement or gap-register changes. A manually changed story is never overwritten silently: for each one you choose to **keep** it (recorded in the story state without touching the document), **reconcile** it (`/ba-requirements:generate-stories` carries the edit into the other version) or **regenerate** it from the other version (the replaced file is backed up). A detailed story you edited leaves its ultra-lean version flagged until it is updated. Sections or files that break the story contract are reported and left for you to fix.
 
 ### `/ba-requirements:generate-report`
 
-Rebuilds `report/phase3-report.html` from the saved document, the gap register and the state. It never changes a story, an ID, the document or a recorded decision. Use it after a report failure, or whenever you want a fresh view.
+Rebuilds `report/phase3-report.html` from `stories/detailed_stories.md`, the gap register and the state. It never changes a story, an ID, the document or a recorded decision. Use it after a report failure, or whenever you want a fresh view.
 
 ### The story format
 
-Each story in the `# Development Stories` section has exactly four fields. The section is always the last part of the document.
+Each story exists in two representations that share one Story ID and one summary.
+
+- The **ultra-lean story** lives in the `# Development Stories` section of your requirements document (always its last section). It contains only the Story ID, a concise summary of 3-7 words (both in the heading) and the functional acceptance criteria as one concise statement. No bullets, no Gherkin, no implementation notes, no non-functional criteria.
+- The **detailed stories** all live in one file, `stories/detailed_stories.md` (never one file per story). Each is the authoritative, implementation-ready version with the same fields every time: description, preconditions, functional behaviour, business rules, detailed Given/When/Then acceptance criteria, alternate and error scenarios, non-functional requirements and dependencies. Only what the atomic requirements and confirmed decisions support is included; nothing is invented for an unresolved gap, and an empty optional field reads `Not specified.`
+
+Ultra-lean story in the document:
 
 ```markdown
 # Development Stories
 
-## US-001
+## US-001 — Registered user login
 
-**Summary:** User authentication using registered credentials
-
-**Detailed Description:**
-As a registered user, I want to log in using my registered email address and
-password so that I can securely access my account.
-
-**Acceptance Criteria:**
-
-1. Given a registered user provides valid credentials, when the user submits
-   the login form, then the system authenticates the user and grants access.
-
-2. Given a user provides invalid credentials, when the user submits the login
-   form, then the system rejects the login attempt.
+**Acceptance Criteria:** The system authenticates registered users with valid credentials, rejects invalid credentials with the defined error response, and grants access only after successful authentication.
 ```
 
-No requirement IDs, gap IDs, priorities, statuses or decisions appear in a story. Those mappings live in `stories/story-generation-state.json`; gaps and decisions are in the report. Story IDs (`US-001`, ...) are unique, sorted numerically, kept when a story is updated, and never reused after a story is removed.
+The matching detailed story in `stories/detailed_stories.md`:
+
+```markdown
+# Detailed Stories
+
+## US-001 — Registered user login
+
+**Description:**
+As a registered user, I want to log in with my registered email address and password so that I can access my account.
+
+**Preconditions:**
+- The user has a registered account.
+
+**Functional Behaviour:**
+- The system authenticates the user against the registered email address and password.
+- A successful login grants access to the authenticated area.
+
+**Business Rules:**
+- A rejected login does not reveal whether the email address or the password was wrong.
+
+**Acceptance Criteria:**
+1. Given valid credentials, when the user logs in, then access is granted and the authenticated area is shown.
+2. Given an unknown email address, when the user logs in, then access is denied and a generic error message is displayed.
+3. Given a wrong password for a registered email address, when the user logs in, then access is denied and the same generic error message is displayed.
+
+**Alternate and Error Scenarios:**
+- Unknown email address and wrong password produce the same rejection.
+
+**Non-Functional Requirements:**
+- Login completes within 2 seconds under normal load.
+
+**Dependencies:**
+Not specified.
+```
+
+(The example is illustrative: real stories contain only what your requirements and recorded decisions state.) The ultra-lean rules are in `rules/story-writing-rules.md` and `rules/acceptance-criteria-rules.md`: a concise 3-7 word summary; one statement for the essential functional behaviour and key business rules; detailed scenarios, implementation notes, technical design and non-functional criteria stay out. Ultra-lean never means lossy: no confirmed functional rule is dropped to shorten a story, and no behaviour is invented (unresolved behaviour stays a gap). Enrichment changes the detailed story first, merges a decision into an existing item where it fits, and keeps the ID, summary and unrelated criteria. `validate-development-stories.py` rejects Given/When/Then and more than one statement in the lean criteria and prints advisory `WARNING` lines for a summary outside 3-7 words, a long statement or one that looks non-functional; warnings never fail validation.
+
+No requirement IDs, gap IDs, priorities, statuses or decisions appear in either version of a story. Those mappings live in `stories/story-generation-state.json`; gaps and decisions are in the report. Story IDs (`US-001`, ...) are unique, sorted numerically, kept when a story is updated, and never reused after a story is removed.
+
+**Synchronisation.** The state keeps a hash of the ultra-lean story and of the detailed story for every ID, a hash of the whole detailed file, and which detailed version the ultra-lean story was last derived from. When a detailed story changes, its ultra-lean version is updated from it. Edits you make by hand to either version are detected, never silently overwritten, and you decide whether to keep, reconcile or regenerate them.
 
 ### Phase 3 artifacts
 
 ```text
 <project-root>/
-├── <your requirements>.md          '# Development Stories' section appended / updated (the only part Phase 3 writes)
+├── <your requirements>.md          ultra-lean '# Development Stories' section appended / updated (the only part Phase 3 writes in it)
 ├── stories/
-│   ├── story-generation-state.json internal: IDs, requirement and gap mappings, hashes, decision ledger
-│   └── backups/                    copy of the document before each change to it
+│   ├── detailed_stories.md         all detailed functional and non-functional stories in one file (authoritative)
+│   ├── story-generation-state.json internal: IDs, requirement and gap mappings, hashes of both versions, decision ledger
+│   └── backups/                    copy of the document (and of detailed_stories.md) before each change to it
 └── report/
-    └── phase3-report.html          generated, read-only, works offline
+    └── phase3-report.html          generated from detailed_stories.md, read-only, works offline
 ```
 
 ### The HTML report
 
-Self-contained (no server, CDN or database). Sections: project overview (timestamp, target document, story and gap counts, validation and synchronisation status), Development Stories, Open Gaps, Resolved Gaps (with decisions and resolution time), Skipped Gaps, Business Decisions (history with the current decision marked, and whether it is reflected in the stories) and a separate Traceability section. Story entries show only ID, summary, description and acceptance criteria. All source text is HTML-escaped. Anything not recorded is shown as `Not recorded`; if there is no valid gap register the gap sections say so instead of showing anything. If a refresh fails, the previous report is kept and the command says it is stale.
+Self-contained (no server, CDN or database). Sections: project overview (timestamp, target document, detailed story and document story counts, gap counts, validation, generation and synchronisation status), Development Stories, Open Gaps, Resolved Gaps (with decisions and resolution time), Skipped Gaps, Business Decisions (history with the current decision marked, and whether it is reflected in the stories) and a separate Traceability section (story-to-requirement, story-to-gap and requirement-to-story). The story entries are read from `stories/detailed_stories.md` and show every field of the detailed story, functional and non-functional, not the shortened document entries, plus whether the document entry is in sync; they carry no requirement or gap IDs. A story with no detailed story is flagged rather than replaced by its shortened text. All source text is HTML-escaped. Anything not recorded is shown as `Not recorded`; if there is no valid gap register the gap sections say so instead of showing anything. If a refresh fails, the previous report is kept and the command says it is stale.
 
 ### Safety rules in short
 
-- Only the `# Development Stories` section is written. Everything else in the document is preserved byte for byte (encoding, line endings, BOM).
+- Only the `# Development Stories` section of your document is written (with ultra-lean stories). Everything else in the document is preserved byte for byte (encoding, line endings, BOM). Detailed stories are written only to `stories/detailed_stories.md`.
 - If another top-level heading follows the section, the heading is duplicated or look-alike, or the boundary is otherwise unclear, nothing is written until you fix it.
-- A story you edited by hand is never overwritten, a story is never removed, and a deleted story is never restored without your consent for that story.
+- A story you edited by hand (in the document or in `detailed_stories.md`) is never overwritten, a story is never removed, and a deleted story is never restored without your consent for that story. The previous `detailed_stories.md` is kept in `stories/backups/` before every change to it.
 - If the document changes while Phase 3 is working, nothing is overwritten.
-- If a write or its read-back verification fails, the previous document is kept (or restored). The state is saved only after the document is verified.
+- If a write or its read-back verification fails, the previous document and `detailed_stories.md` are kept (or restored). The state is saved only after the document and the detailed stories are verified.
 
 ## Install and test locally
 
@@ -312,10 +346,10 @@ Then run the commands from your project directory. Use `/reload-plugins` after e
 | `scripts/validate-gap-register.py` | Validates structure and semantics of `gaps.json`. Exit `0` valid, `1` invalid, `2` unreadable. |
 | `scripts/generate-gap-report.py` | Validates `gaps.json` and writes `gap-analysis.html`. No report is written for an invalid register. |
 | `scripts/gap-register-store.py` | Safe persistence used by both Phase 2 commands: `inspect`, `save`, `list`, `resolve`, `skip`, `reopen`, `summary`, `regenerate-report`. |
-| `scripts/story_common.py` | Phase 3 library: section boundary detection, story parsing and rendering, hashing, paths, safe writes, input and state loading. |
-| `scripts/validate-development-stories.py` | Validates a structured story draft (structure, IDs, references, duplicates, coverage, applied decisions) or the managed section of a document. Exit `0` valid, `1` invalid, `2` unreadable. |
+| `scripts/story_common.py` | Phase 3 library: section boundary detection, ultra-lean and detailed story parsing and rendering, hashing, paths, safe writes, input and state loading. |
+| `scripts/validate-development-stories.py` | Validates a structured story draft (structure, IDs, references, duplicates, coverage, applied decisions, ultra-lean and detailed versions) or, with `--document`, the managed section together with `stories/detailed_stories.md` (matching IDs and summaries, current hashes). Exit `0` valid, `1` invalid, `2` unreadable. |
 | `scripts/sync-development-stories.py` | Safe persistence used by the Phase 3 commands: `inspect`, `export`, `apply`, `accept`, `summary`, `regenerate-report`. |
-| `scripts/generate-phase3-report.py` | Builds `report/phase3-report.html`. |
+| `scripts/generate-phase3-report.py` | Builds `report/phase3-report.html` from `stories/detailed_stories.md`. |
 | `scripts/pipeline-state.py` | Checkpoint and resume state for `/ba-requirements:run`: `inspect`, `begin`, `resume`, `start`, `check-inputs`, `complete`, `fail`, `block`, `triage-event`, `invalidate`, `refresh`, `gate`, `summary`. Exit `0` ok, `1` refused or blocked, `2` unreadable. |
 
 ```text
