@@ -22,31 +22,38 @@ Each prints JSON with `ok`. Exit 0 = done, 1 = refused (nothing changed), 2 = I/
 
 ## Presenting a gap
 
-Show, in plain readable text:
+Show, in plain readable text, the gap's ID, priority and one concise gap statement (shorten `gap_definition` to a single sentence without changing its meaning), then the choices for its priority:
 
 ```text
 Gap 2 of 12 — GAP-005 — Critical (skipped earlier)
 
-<gap_definition>
-
-Affected requirements:
-- REQ-001: <description>
-- REQ-004: <description>
+<one concise gap statement>
 
 Previous decisions: <only if the gap was reopened; show them with dates>
+
+Choices:
+- Skip for now — skip this gap and continue.
+- Other — enter a description or decision in free text.
 ```
 
-Then offer the actions in words, not as a long menu:
+**Critical and High gaps** offer exactly these choices:
 
-- give the decision (the user may simply type it),
-- skip this gap,
-- skip all remaining gaps (ends the session),
-- reopen a resolved gap,
-- stop.
+- **Skip for now** — skip this gap and continue.
+- **Other** — the user enters a description or decision in free text.
+
+**Medium and Low gaps** offer exactly these choices:
+
+- **Skip all remaining gaps** — skip all remaining Medium/Low gaps in the current triage run.
+- **Skip this gap** — skip only the current gap and continue.
+- **Other** — the user enters a description or decision in free text.
+
+Present the choices as text and take the user's reply; do not use AskUserQuestion for them (a Critical/High gap has only one fixed choice besides free text). Choose the list by the gap's `priority`. "Skip all remaining gaps" is never offered for a Critical or High gap.
+
+Reopening a resolved gap, revising a recorded decision and stopping stay available when the user asks for them, but they are not listed as choices.
 
 ## Capturing a decision
 
-1. Ask for the business decision, or take the text the user typed.
+1. Take the text the user entered under **Other** (a decision or a description) as the starting point. If it is only a description or question and not a decision, answer or clarify as needed and show the choices again.
 2. Check it against the gap definition. If the gap asks "whether, how many, how long" and the answer covers only part, ask one focused follow-up for the missing part. Ask again only if still unclear.
 3. Treat these as not yet decisions, and offer to skip instead of recording them: "I don't know", "TBD", "ask someone else", "whatever is standard".
 4. Do not propose a business answer, fill gaps with your own assumptions or choose between alternatives for the user. You may restate ambiguity and ask which meaning is intended.
@@ -55,13 +62,13 @@ Then offer the actions in words, not as a long menu:
 7. Read the JSON result. On success say that the decision was recorded and the gap is resolved, and that the report was regenerated. On any failure say what failed and that nothing was recorded; offer to retry.
 8. Move to the next gap.
 
-## Skip this gap
+## Skip for now / Skip this gap
 
-Run `skip --gap-id`. Say it is marked skipped, remains unresolved and will return in the next triage session. Move on.
+Run `skip --gap-id` at once. Say it is marked skipped, remains unresolved and is kept for later triage; for a Critical or High gap add that it still blocks story generation until resolved. Move on.
 
-## Skip all remaining gaps
+## Skip all remaining gaps (Medium and Low only)
 
-Make no store call for the remaining gaps. Say that they keep their current status (skipped stays skipped, unreviewed stays open) and that nothing was resolved by this. Go to the session summary. Only changes already confirmed and saved in this session exist.
+Only offered on a Medium or Low gap. Record each skip immediately: for the current gap and every later queue entry that is Medium or Low and still `open`, run `skip --gap-id`, one gap at a time (a gap already `skipped` stays skipped; no call is needed). Read each JSON result; if one fails, stop, say which gap failed and that the earlier skips are saved. Say how many gaps were marked skipped, that they remain unresolved and are kept for later triage, and that nothing was resolved by this. Go to the session summary. Critical and High gaps are never touched by this choice.
 
 ## Reopen a resolved gap
 

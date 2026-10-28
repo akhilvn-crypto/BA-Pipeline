@@ -44,13 +44,18 @@ python -c "import tempfile; print(tempfile.mkdtemp(prefix='ba-triage-'))"
 
 Open with one short line: how many gaps are eligible and how many of those were skipped earlier. Then go through the queue in the order returned, one gap at a time, exactly as the `gap-triage` skill describes: present the gap with its progress, ask what the user wants, capture and confirm any decision, save immediately, and continue.
 
-Supported actions: provide a decision; skip this gap; skip all remaining gaps; reopen a resolved gap; revise a recorded decision (only when asked); stop.
+Choices per gap (show the ID, priority and one concise gap statement, then):
+
+- Critical and High: **Skip for now**; **Other** (free-text description or decision).
+- Medium and Low: **Skip all remaining gaps** (all remaining Medium/Low gaps in this run); **Skip this gap**; **Other** (free-text description or decision).
+
+Reopening a resolved gap, revising a recorded decision and stopping are available when the user asks, but are not listed as choices.
 
 Hard rules (details in `gap-triage-rules.md`):
 
 - A gap becomes resolved only after the user confirms the captured decision.
-- Skipping never adds a decision, deletes or downgrades the gap, or counts as resolved.
-- Skip-all and stop write nothing further; confirmed changes already saved stay.
+- Skipping never adds a decision, deletes or downgrades the gap, or counts as resolved. Record every skip immediately through the store and keep skipped gaps for later triage.
+- Skip all remaining applies to Medium and Low gaps only; each remaining open Medium/Low gap is recorded as skipped. Stop writes nothing further; confirmed changes already saved stay.
 - After every save, read the JSON result. Do not report success unless `ok` is true; for exit code 3 say the register saved but the report needs `regenerate-report`.
 - Present each gap at most once per session. Do not make business decisions for the user.
 

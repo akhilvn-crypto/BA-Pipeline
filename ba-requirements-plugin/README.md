@@ -26,7 +26,7 @@ It guides you through the whole flow and asks before it overwrites anything:
 | 1. Source | Finds existing artifacts, asks where the requirements are. | Give a file, folder or path; confirm the match. |
 | 2. Phase 1: atomic requirements | Splits the requirements into atomic, traceable `REQ-xxx` items, validated and saved. | Nothing. |
 | 3. Phase 2: gap analysis | Finds missing, ambiguous or conflicting information, prioritises it (Critical to Low) and builds the gap register and dashboard. | Nothing. |
-| 4. Phase 2: triage | Shows gaps one at a time, Critical first. Every Critical and High gap must be resolved before stories are generated; if any is left open or skipped, you are returned to triage for those gaps. Medium and Low gaps may stay open. | Give a decision, skip the gap, skip all, or stop (progress is saved). |
+| 4. Phase 2: triage | Shows gaps one at a time, Critical first. Every Critical and High gap must be resolved before stories are generated; if any is left open or skipped, you are returned to triage for those gaps. Medium and Low gaps may stay open. | Give a decision (Other), skip the gap, skip all remaining Medium/Low gaps, or stop (progress is saved). |
 | 5. Phase 3: stories | Writes every story twice under one ID: a detailed functional and non-functional story in the single file `stories/detailed_stories.md` and an ultra-lean story (ID, concise summary, one functional criteria statement) in a `# Development Stories` section of your requirements document. Then enriches only the stories your decisions affect. | Pick the target document if there are several; confirm the preview. |
 | 6. Report | Writes `report/phase3-report.html` from `stories/detailed_stories.md` and prints a summary with real counts. | Open the report in a browser. |
 
@@ -85,7 +85,7 @@ One command for the whole workflow. It is an orchestration layer only: each phas
 0. Reads the checkpoint first (see "Checkpoint and resume" below) and offers to resume an unfinished run.
 1. Asks where the requirements are, then detects existing artifacts (atomic requirements, gap register, stories section, report). Nothing is overwritten silently; a valid existing `atomic_requirements.json` can be reused or regenerated, with a warning if a source file is newer than it.
 2. **Phase 1.** Atomic requirements, validated and saved. A failure stops the pipeline.
-3. **Phase 2.** Gap analysis, saved register and gap report (validation gate), then interactive triage one gap at a time: give a decision, skip this gap, skip all remaining gaps, or stop (the pipeline pauses; every answer already given is saved and `/ba-requirements:run` resumes).
+3. **Phase 2.** Gap analysis, saved register and gap report (validation gate), then interactive triage one gap at a time: give a decision, skip this gap, skip all remaining Medium/Low gaps, or stop (the pipeline pauses; every answer already given is saved and `/ba-requirements:run` resumes).
 4. **Story-generation gate.** Phase 3 starts only when every **Critical and High** gap is `resolved`. If any is open or skipped, including after "skip" or "skip all remaining", the pipeline names them and returns you to triage for those gaps; you can also exit and resume later. Medium and Low gaps may stay open or skipped and do not block.
 5. **Phase 3.** Stories are generated (detailed and ultra-lean versions), then enriched using only the decisions of resolved gaps. The requirements document holds only Story ID, short summary and acceptance criteria; mappings, hashes and synchronisation metadata stay in `stories/story-generation-state.json`.
 6. Refreshes `report/phase3-report.html`. If that fails, the document and state stay valid, the previous report is kept, the run is recorded as stopped at the report (not completed), and the summary says the report is stale or unavailable; resuming reruns only the report.
@@ -159,9 +159,15 @@ Run it again at any time:
 
 Presents open and skipped gaps one at a time, Critical first, then High, Medium, Low, and by gap number within a priority:
 
-- **Provide a decision** — it is captured, clarified if incomplete, read back to you, and recorded only after you confirm. The gap becomes `resolved`.
-- **Skip this gap** — it becomes `skipped`; still unresolved and offered again next session.
-- **Skip all remaining** — ends the session without changing the remaining gaps.
+Each gap is shown with its ID, priority and one concise gap statement, followed by these choices:
+
+- **Critical and High gaps:** **Skip for now** (the gap becomes `skipped`) or **Other**.
+- **Medium and Low gaps:** **Skip all remaining gaps** (every remaining Medium/Low gap in this run becomes `skipped`), **Skip this gap**, or **Other**.
+
+What they do:
+
+- **Other** — enter a description or decision in free text. A decision is captured, clarified if incomplete, read back to you, and recorded only after you confirm. The gap becomes `resolved`.
+- **Skip** — recorded immediately; the gap stays unresolved and is offered again next session. A skipped Critical or High gap still blocks story generation.
 - **Reopen a resolved gap** (on request) — back to `open`; its decision history is kept.
 - **Revise a decision** (on request) — a new decision is appended; earlier ones stay.
 

@@ -185,9 +185,9 @@ Otherwise run triage, then the gate.
 
 `pipeline-state.py start --operation gap_triage` first (a resumed triage simply starts again and presents the remaining open and skipped gaps, Critical and High first). Follow `triage-gaps.md` Steps 1–3 (the `gap-triage` skill): one gap at a time, Critical first, each decision confirmed before it is recorded and saved immediately through the store, and each answer, skip or status change recorded at once with `triage-event` (see "Checkpoint protocol"). The user can:
 
-- provide a decision, which resolves the gap once confirmed;
-- **skip** the current gap (it becomes `skipped` and stays unresolved). If the gap is Critical or High, say in one line that it still blocks story generation until it is resolved;
-- **skip all remaining gaps**: nothing further is written and the remaining gaps keep their status. This ends the pass; it does **not** continue to Phase 3. Complete `gap_triage` and go to 5b;
+- enter a decision under **Other**, which resolves the gap once confirmed;
+- **Skip for now** (Critical and High) or **Skip this gap** (Medium and Low): the gap becomes `skipped` and stays unresolved. If the gap is Critical or High, say in one line that it still blocks story generation until it is resolved;
+- **skip all remaining gaps** (offered on Medium and Low gaps only): every remaining open Medium/Low gap is recorded as `skipped` at once, one at a time through the store, each with its `triage-event`; Critical and High gaps are never affected. This ends the pass; it does **not** continue to Phase 3. Complete `gap_triage` and go to 5b;
 - **stop / exit**: the pipeline **pauses**. Everything already confirmed is already saved in the register and the checkpoint. Leave `gap_triage` as it is (`in_progress`), do not start Phase 3. Go to Step 9 with status `PAUSED` and tell the user that running `/ba-requirements:run` again offers Resume (the source and Phase 1 and 2 outputs are validated and reused, and triage returns to the remaining open and skipped gaps, Critical and High first).
 
 If the session is interrupted unexpectedly, no special handling is needed: each answer was saved the moment it was confirmed and recorded in the checkpoint, and the next run offers Resume from the interrupted operation.
@@ -207,7 +207,7 @@ When the queue is exhausted, or after skip all remaining, `pipeline-state.py com
 
 ### 5c — Blocker triage pass
 
-Triage only the current blockers, in the order `list` returned them (Critical first), with the same rules, confirmations, immediate saves and `triage-event` records as 5a. Override the skill's "present each gap at most once per session" rule for this: a blocker skipped in an earlier pass is presented again, but at most once per pass. The user may still skip a gap, skip all remaining, or stop; stop pauses as in 5a. When the pass ends for any reason other than stop, return to 5b (`start` then `complete` on `gate_validation` again, with a fresh `list`). Repeat 5b–5c until the gate passes or the user exits.
+Triage only the current blockers, in the order `list` returned them (Critical first), with the same rules, confirmations, immediate saves and `triage-event` records as 5a. Override the skill's "present each gap at most once per session" rule for this: a blocker skipped in an earlier pass is presented again, but at most once per pass. The user may still skip a gap (**Skip for now**) or stop; stop pauses as in 5a. Only Critical and High gaps are presented here, so "skip all remaining gaps" is not offered. When the pass ends for any reason other than stop, return to 5b (`start` then `complete` on `gate_validation` again, with a fresh `list`). Repeat 5b–5c until the gate passes or the user exits.
 
 Medium and Low gaps are not presented in this pass. They are only presented in 5a, or by running `/ba-requirements:triage-gaps` later.
 
