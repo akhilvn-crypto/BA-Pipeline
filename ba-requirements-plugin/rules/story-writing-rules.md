@@ -19,21 +19,21 @@ Exactly three things, nothing else:
 |---|---|
 | Story ID | `US-001` style, assigned by `scripts/sync-development-stories.py`; identical in both representations |
 | Summary | A concise, meaningful one-line label of the story's core capability, typically 3-7 words (for example "Registered user login"); understandable at a glance, not a full sentence; **identical** in both representations |
-| Acceptance criteria | **One** concise statement covering all essential, confirmed **functional** outcomes and business rules |
+| Acceptance criteria | **One** concise statement of the primary expected **functional** outcome, from the user's perspective |
 
 Format (the scripts write it; you supply plain text):
 
 ```markdown
 ## US-001 — Registered user login
 
-**Acceptance Criteria:** The system authenticates registered users with valid credentials, rejects invalid credentials with the defined error response, and grants access only after successful authentication.
+**Acceptance Criteria:** Users can log in with valid credentials and are prevented from accessing the system with invalid credentials.
 ```
 
 Rules:
 
 1. Keep the summary concise but descriptive (typically 3-7 words): a label of the core capability, neither a vague word nor a full explanatory sentence.
 2. The criteria are **one statement**, not several bullets, scenarios or **Given/When/Then** (the validator rejects Gherkin and more than one statement). They describe what the system must do, not how it is implemented, and are specific, observable and testable.
-3. Combine the essential functional behaviour and the key business rules into that one statement. Never omit a confirmed functional rule merely to shorten the story, and never invent behaviour.
+3. State only the primary functional outcome in that one short statement and preserve the story's core intent. Detailed conditions, alternate flows, edge cases and exhaustive business rules live only in the detailed story and are not duplicated here. Never invent behaviour.
 4. Exclude detailed scenarios, implementation notes, technical design and every non-functional criterion (performance, availability, accessibility, security targets and so on). Those live only in the detailed story.
 5. No description, no preconditions, no metadata of any kind. Requirement IDs, gap IDs, decisions, priorities and statuses never appear in a story.
 

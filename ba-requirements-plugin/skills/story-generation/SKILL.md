@@ -7,7 +7,7 @@ description: Turn atomic requirements into coherent development stories - groupi
 
 Follow `rules/story-writing-rules.md` and `rules/acceptance-criteria-rules.md`; design criteria with the `acceptance-criteria-design` skill. This skill is the method.
 
-Every story is written in two representations under one Story ID: the **detailed story** (complete functional and non-functional detail, saved in the single file `stories/detailed_stories.md`) and an **ultra-lean story** (Story ID, a concise summary and one functional acceptance-criteria statement, saved in the requirements document). Write the detailed story first, then derive the ultra-lean one from it.
+Every story is written in two representations under one Story ID: the **detailed story** (complete functional and non-functional detail, saved in the single file `stories/detailed_stories.md`) and an **ultra-lean story** (Story ID, a concise summary and one short, high-level acceptance-criteria statement of the primary functional outcome, saved in the requirements document). Write the detailed story first, then derive the ultra-lean one from it.
 
 ## Inputs
 
@@ -33,12 +33,12 @@ Every story is written in two representations under one Story ID: the **detailed
    - Add nothing unsupported. Never invent an answer for an open or skipped gap. Use an empty list for an optional field the requirements say nothing about; the file then reads `Not specified.`
 6. **Derive the ultra-lean story** (`summary` and `lean_acceptance_criteria`) from the detailed story.
    - `summary`: a concise, meaningful one-line label of the core capability, typically 3-7 words ("Registered user login"), understandable at a glance and not a full sentence. The same text is the heading of the story in both representations.
-   - `lean_acceptance_criteria`: an array holding exactly **one** concise statement that covers all essential, confirmed functional outcomes and business rules, specific, observable and testable, in plain language. Not several bullets, not Given/When/Then. No implementation detail, no detailed scenarios, no non-functional criteria.
-   - Ultra-lean never means lossy: keep every confirmed functional rule that is essential to the outcome; do not contradict the detailed story or add behaviour it lacks.
+   - `lean_acceptance_criteria`: an array holding exactly **one** short, high-level statement of the primary expected functional outcome from the user's perspective, in plain language (for example "Users can log in with valid credentials and are prevented from accessing the system with invalid credentials."). Not several bullets, not Given/When/Then. No detailed conditions, alternate flows, edge cases, exhaustive business rules, implementation detail or non-functional criteria, and do not duplicate the detailed acceptance criteria.
+   - Keep the story's core intent and stay clear and meaningful; do not contradict the detailed story or add behaviour it lacks. Detailed rules live only in the detailed story.
 7. **Respect gaps.** For each story look at the gaps whose affected requirements it covers (the script derives the same relation). Open and skipped: write only what the requirements support and leave the undecided behaviour out. Resolved: read the latest decision in `decisions_recorded`; if it changes expected behaviour of this story, include it (and list the gap in `applied_decisions`, and in `decisions_reviewed`).
 8. **Account for every requirement.** Each requirement is in some story's `source_requirement_ids`, or in `not_covered_requirements` with a reason (for example "a statement of scope, not a capability to build").
 9. **Check for duplicates.** No two stories for the same capability; no two with the same summary.
-10. **Check consistency.** Before saving: the detailed story is complete and supported; the lean statement is high level, functional and testable at the level of an outcome; no confirmed functional rule or required exception was lost from either version; the ultra-lean story does not contradict or omit an essential outcome of the detailed story; no non-functional criterion leaked into the lean statement; nothing is repeated or unsupported.
+10. **Check consistency.** Before saving: the detailed story is complete and supported; the lean statement is one short, high-level functional outcome that does not repeat the detailed criteria; the detailed story lost no confirmed functional rule or required exception; the ultra-lean story does not contradict the detailed story or lose its core intent; no non-functional criterion leaked into the lean statement; nothing is repeated or unsupported.
 11. **Validate.** Write the draft file and run `scripts/validate-development-stories.py <draft> --project-root <root>` (add `--no-gaps` only when the user chose to proceed without gap context). Fix every error. Treat warnings as a prompt to improve the wording.
 
 ## Draft format
@@ -52,7 +52,7 @@ A JSON object, UTF-8, two-space indent (schema: `schemas/development-stories.sch
       "story_id": null,
       "summary": "Registered user login",
       "lean_acceptance_criteria": [
-        "The system authenticates registered users with valid credentials, rejects invalid credentials with the defined error response, and grants access only after successful authentication."
+        "Users can log in with valid credentials and are prevented from accessing the system with invalid credentials."
       ],
       "detailed": {
         "description": "As a registered user, I want to log in with my registered email address and password so that I can access my account.",

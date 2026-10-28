@@ -25,12 +25,12 @@ Every criterion is:
 
 These apply to the ultra-lean version only, which is derived from the detailed story.
 
-1. **One concise statement**, not several bullets: it covers all essential, confirmed functional outcomes and business rules, including the main failure outcome ("The system authenticates registered users with valid credentials, rejects invalid credentials with the defined error response, and grants access only after successful authentication.").
+1. **One short, high-level statement**, not several bullets: it states the primary expected functional outcome from the user's perspective ("Users can log in with valid credentials and are prevented from accessing the system with invalid credentials."). Keep it clear and meaningful and preserve the story's core intent.
 2. **Not Gherkin.** No Given / When / Then, no step-by-step scenarios, no bullets, no numbering.
 3. Describe what the system must do, not how it is implemented. The statement is specific, observable and testable.
-4. Combine closely related checks that share an outcome into the one statement; do not drop an important behaviour merely to make it shorter.
-5. Exclude detailed scenarios, implementation notes, technical design and non-functional criteria (performance, availability, accessibility, security targets). Those stay in the detailed story.
-6. Never remove a confirmed functional rule merely to shorten a story, and never add behaviour the detailed story lacks.
+4. Exclude detailed conditions, alternate flows, edge cases and exhaustive business rules, as well as implementation notes, technical design and non-functional criteria (performance, availability, accessibility, security targets). Those stay in the detailed story.
+5. Do not duplicate the detailed criteria: the statement summarises the outcome they verify and does not restate their conditions, values or rules.
+6. Never contradict the detailed story and never add behaviour it lacks.
 
 ## What to consider (only where the requirements support it)
 

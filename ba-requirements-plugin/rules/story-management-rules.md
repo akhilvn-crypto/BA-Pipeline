@@ -5,7 +5,7 @@
 | Artifact | Location | Role |
 |---|---|---|
 | Detailed stories | `<project-root>/stories/detailed_stories.md`: **one** consolidated Markdown file for all stories | The complete functional and non-functional stories. The single detailed story repository and the source of the HTML report |
-| Ultra-lean stories | `# Development Stories` section at the end of the user's original Markdown requirements document | The high-level, functional-oriented version of each story (Story ID, concise summary, one acceptance-criteria statement), derived from its detailed story, so the requirements document stays short |
+| Ultra-lean stories | `# Development Stories` section at the end of the user's original Markdown requirements document | The high-level, functional-oriented version of each story (Story ID, concise summary, one short high-level acceptance-criteria statement), derived from its detailed story, so the requirements document stays short |
 | Story state | `<project-root>/stories/story-generation-state.json` | Internal: story identity, requirement-to-story and gap-to-story mappings, hashes of both versions, decision ledger, synchronisation metadata |
 | Backups | `<project-root>/stories/backups/<file>.<timestamp>.bak` | Copy of the requirements document or of `detailed_stories.md` before it is changed |
 | HTML report | `<project-root>/report/phase3-report.html` | Generated read-only view; never a source of truth |
@@ -22,7 +22,7 @@ Never write project artifacts into the plugin installation directory. Never writ
 ## One story, two representations
 
 1. Every story has one section in `stories/detailed_stories.md` and one ultra-lean entry in the managed section, with the same Story ID and the same summary (both are in the heading `## US-001 — Registered user login`). Each is listed in the state with its own content hash.
-2. The detailed story is authoritative and is written first. The ultra-lean story is derived from it and must not contradict it, omit a confirmed functional rule of it, or add behaviour it lacks. A draft supplies both (`lean_acceptance_criteria` and the `detailed` object).
+2. The detailed story is authoritative and is written first. The ultra-lean story is derived from it and must not contradict it, lose its core intent, or add behaviour it lacks. A draft supplies both (`lean_acceptance_criteria` and the `detailed` object).
 3. The state records, per story, the hash of the ultra-lean story (`story_content_hash`), the hash of the detailed story (`detailed_content_hash`) and the detailed version the ultra-lean story was last derived from (`lean_derived_from`). When a detailed story changes and its ultra-lean story has not been updated (or confirmed with `lean_reviewed`), `inspect` and the report flag it as `lean_needs_update`. The state also records the hash of the whole detailed stories file (`detailed_document_hash`).
 4. Mappings (requirements, gaps, decisions), hashes and synchronisation metadata are never written into either representation; they live only in the state.
 5. A project created by an earlier plugin version (stories with Summary and Detailed Description fields, or one file per detailed story) is migrated by `/ba-requirements:generate-stories`: `inspect` reports the old layout, the agent writes the detailed stories from the atomic requirements and confirmed decisions and rewrites each ultra-lean story, and `apply --overwrite` replaces the old entries after the user agrees. IDs are kept. The replaced document is backed up.
@@ -64,8 +64,8 @@ Never write project artifacts into the plugin installation directory. Never writ
 
 ## Ultra-lean stories
 
-1. Generation and enrichment follow the standards in `story-writing-rules.md` and `acceptance-criteria-rules.md`: a concise 3-7 word summary and one concise statement of the functional acceptance criteria.
-2. Ultra-lean never means lossy. No confirmed functional rule is dropped to shorten a story, and nothing unsupported is added. Detailed scenarios, implementation notes, technical design and non-functional criteria are excluded from the document and kept in the detailed story.
+1. Generation and enrichment follow the standards in `story-writing-rules.md` and `acceptance-criteria-rules.md`: a concise 3-7 word summary and one short, high-level statement of the primary expected functional outcome.
+2. Ultra-lean keeps the story's core intent and adds nothing unsupported. Detailed conditions, alternate flows, edge cases, exhaustive business rules, implementation notes, technical design and non-functional criteria are excluded from the document and kept in the detailed story, whose acceptance criteria are not duplicated.
 3. The document and the detailed file hold no requirement IDs, gap IDs, decisions or priorities. Those stay in the internal state and in the report's own sections.
 
 ## Decision ledger and enrichment

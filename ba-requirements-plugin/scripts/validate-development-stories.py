@@ -61,7 +61,7 @@ _NUMBERING_RE = re.compile(r"^\s*(?:[0-9]+[.)]|[-*+])\s")
 # Ultra-lean lint (rules/story-writing-rules.md). Advisory except for the Gherkin rule and the one-statement rule.
 MIN_SUMMARY_WORDS = 2
 MAX_SUMMARY_WORDS = 7
-MAX_LEAN_CRITERION_WORDS = 70
+MAX_LEAN_CRITERION_WORDS = 30
 _GHERKIN_RE = re.compile(r"^\s*given\b.*\bwhen\b.*\bthen\b", re.IGNORECASE | re.DOTALL)
 _NON_FUNCTIONAL_RE = re.compile(
     r"\b(?:performance|latency|throughput|availability|uptime|scalab\w*|concurren\w*|accessib\w*|response time|"
@@ -89,7 +89,7 @@ def lean_warnings(label, summary, criteria):
         found.append(f"{label}: the acceptance criteria are a list of {len(criteria)} items; combine them into one statement.")
     for item in criteria:
         if len(item.split()) > MAX_LEAN_CRITERION_WORDS:
-            found.append(f"{label}: the acceptance criteria statement is long ({len(item.split())} words); keep the essential functional outcomes and rules and leave scenarios to the detailed story.")
+            found.append(f"{label}: the acceptance criteria statement is long ({len(item.split())} words); keep only the primary functional outcome and leave conditions, rules and scenarios to the detailed story.")
         if _NON_FUNCTIONAL_RE.search(item):
             found.append(f"{label}: the acceptance criteria statement looks like a non-functional requirement; non-functional detail belongs in the detailed story only.")
     return found
@@ -207,7 +207,7 @@ def validate_draft(draft, requirements, register):
                 if len(lean_criteria) != 1:
                     errors.append(
                         f"{label}: 'lean_acceptance_criteria' must hold exactly one statement ({len(lean_criteria)} given); "
-                        "combine the essential functional outcomes and business rules into a single statement."
+                        "combine them into a single short statement of the primary functional outcome."
                     )
                 for number in gherkin_criteria(lean_criteria):
                     errors.append(

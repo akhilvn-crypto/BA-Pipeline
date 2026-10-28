@@ -22,7 +22,7 @@
             "pattern": "\\S"
           },
           "lean_acceptance_criteria": {
-            "description": "The ULTRA-LEAN acceptance criteria written into the requirements document: exactly ONE concise statement covering all essential, confirmed functional outcomes and business rules, specific, observable and testable. Not several bullets, not Given/When/Then, no implementation detail, no non-functional criteria. Plain text without numbering or bullets.",
+            "description": "The ULTRA-LEAN acceptance criteria written into the requirements document: exactly ONE short, high-level statement of the primary expected functional outcome from the user's perspective. Not several bullets, not Given/When/Then, no detailed conditions, alternate flows, edge cases or exhaustive business rules, no implementation detail, no non-functional criteria, and not a copy of the detailed acceptance criteria. Plain text without numbering or bullets.",
             "type": "array",
             "minItems": 1,
             "maxItems": 1,

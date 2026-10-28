@@ -1,5 +1,5 @@
 {
   "name": "ba-requirements",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "BA requirements analysis, runnable end to end with /ba-requirements:run:Phase 1 decomposes Markdown requirements into validated atomic requirements; Phase 2 identifies and prioritises gaps, saves a gap register and HTML dashboard, and guides interactive gap triage; Phase 3 generates every development story twice under one ID, as a detailed functional and non-functional story in the single consolidated stories/detailed_stories.md and an ultra-lean story (ID, short summary, high-level functional criteria) in the original requirements document, enriches them from resolved gap decisions, reconciles manual edits and publishes a consolidated HTML report built from the detailed stories."
 }

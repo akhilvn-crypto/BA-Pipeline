@@ -10,7 +10,7 @@ You orchestrate this command. Methodology lives in the plugin's agent, skills an
 Plugin root: `${CLAUDE_PLUGIN_ROOT}`
 Project root: the current working directory of this session.
 
-Enrichment is incremental: only the stories a newly resolved or revised decision materially affects change. A confirmed decision is applied to the **detailed story** (its section in `stories/detailed_stories.md`) first, and the ultra-lean story in the requirements document is then derived from the updated detailed story, only where a high-level functional outcome changes. Never regenerate all stories, never decide a gap, never treat an open or skipped gap as a decision. Do not hand-edit the document, `stories/detailed_stories.md`, the state or the report; everything goes through `scripts/sync-development-stories.py`. Use whichever of `python`, `python3`, `py` works.
+Enrichment is incremental: only the stories a newly resolved or revised decision materially affects change. A confirmed decision is applied to the **detailed story** (its section in `stories/detailed_stories.md`) first, and the ultra-lean story in the requirements document is then derived from the updated detailed story, only where the primary functional outcome changes. Never regenerate all stories, never decide a gap, never treat an open or skipped gap as a decision. Do not hand-edit the document, `stories/detailed_stories.md`, the state or the report; everything goes through `scripts/sync-development-stories.py`. Use whichever of `python`, `python3`, `py` works.
 
 ## Step 1 — Load the standards
 
@@ -78,7 +78,7 @@ Invoke `ba-requirements:story-generation-agent` with: the plugin root, mode `enr
 python ${CLAUDE_PLUGIN_ROOT}/scripts/validate-development-stories.py <temp>/draft.json --project-root <project root>
 ```
 
-Read the draft against the export. Check: only stories affected by a decision changed; IDs unchanged; unrelated criteria and the summary untouched; no duplicate criteria (a decision is merged into an existing criterion where it fits); the detailed story carries the full decision (rule, behaviour, criterion, scenario or non-functional target, as fits) and the ultra-lean story agrees with it and stays one concise, high-level functional statement (no bullets, no Given/When/Then, no non-functional criteria); every pending decision appears in `decisions_reviewed` with an honest outcome; no open or skipped gap used as a decision; the decision text is reflected accurately, with the user's values.
+Read the draft against the export. Check: only stories affected by a decision changed; IDs unchanged; unrelated criteria and the summary untouched; no duplicate criteria (a decision is merged into an existing criterion where it fits); the detailed story carries the full decision (rule, behaviour, criterion, scenario or non-functional target, as fits) and the ultra-lean story agrees with it and stays one short, high-level functional statement (no bullets, no Given/When/Then, no detailed conditions, no non-functional criteria); every pending decision appears in `decisions_reviewed` with an honest outcome; no open or skipped gap used as a decision; the decision text is reflected accurately, with the user's values.
 
 ## Step 8 — Preview, then write
 
