@@ -103,7 +103,7 @@ def make_story(summary, lean, sources, story_id=None, applied=None, **detail):
     detailed = {
         "description": f"As a user, I want to {summary.lower()}, so that I can achieve the outcome.",
         "functional_behaviour": [f"The system supports: {summary}."],
-        "acceptance_criteria": [f"Given a user, when the user asks to {summary.lower()}, then the system completes it."],
+        "acceptance_criteria": [f"The system completes a request to {summary.lower()}."],
     }
     detailed.update(detail)
     return {
@@ -126,25 +126,25 @@ def standard_stories():
                    preconditions=["The user has a registered account."],
                    functional_behaviour=["The system authenticates the user against the registered email address and password."],
                    business_rules=["A rejected login does not say which of the two values was wrong."],
-                   acceptance_criteria=["Given a registered user provides valid credentials, when the user submits the login form, then the system authenticates the user.",
-                                        "Given a user provides invalid credentials, when the user submits the login form, then the system rejects the login attempt."],
+                   acceptance_criteria=["A registered user who submits valid credentials is authenticated.",
+                                        "A login attempt with invalid credentials is rejected."],
                    scenarios=["An unknown email address is rejected with the same response as a wrong password."],
                    non_functional_requirements=["Login completes within 2 seconds under normal load."]),
         make_story("Password Reset", ["Registered users can reset their password by email."], ["REQ-002"],
                    description="As a registered user, I want to reset my password by email so that I can regain access to my account.",
-                   acceptance_criteria=["Given a registered user requests a reset, when the request is submitted, then the system sends a reset message to the registered email address."]),
+                   acceptance_criteria=["A reset request from a registered user sends a reset message to the registered email address."]),
         make_story("Session Timeout", ["Inactive sessions are ended."], ["REQ-003"],
                    description="As a registered user, I want inactive sessions to end so that my account stays protected.",
-                   acceptance_criteria=["Given a session is inactive, when the inactivity limit is reached, then the system ends the session."]),
+                   acceptance_criteria=["A session that reaches the inactivity limit is ended."]),
         make_story("Audit Log", ["Security-relevant events are recorded."], ["REQ-004"],
                    description="As an administrator, I want security-relevant events recorded so that I can review them.",
-                   acceptance_criteria=["Given a security-relevant event occurs, when it is processed, then the system records the event."]),
+                   acceptance_criteria=["Every security-relevant event is recorded."]),
         make_story("Report Export", ["Managers can export reports as a file."], ["REQ-005"],
                    description="As a manager, I want to export reports so that I can share them.",
-                   acceptance_criteria=["Given a manager views a report, when the manager requests an export, then the system provides the report as a file."]),
+                   acceptance_criteria=["A manager who requests an export of a report receives it as a file."]),
         make_story("Profile Update", ["Users can update their profile details."], ["REQ-006"],
                    description="As a user, I want to update my profile so that my details stay correct.",
-                   acceptance_criteria=["Given a user edits profile details, when the user saves them, then the system stores the changes."]),
+                   acceptance_criteria=["Saved profile changes are stored."]),
     ]
 
 
@@ -325,7 +325,7 @@ class GenerationTests(ProjectCase):
         self.assertTrue(after.startswith(original))
         self.assertIn("\r\n# Development Stories\r\n\r\n## US-001 — User Login\r\n".encode("utf-8"), after)
         draft, _ = self.export_draft()
-        add_criterion(draft["stories"][4], "Large reports can be exported.", "Given a manager requests an export, when the export is large, then the system still completes it.")
+        add_criterion(draft["stories"][4], "Large reports can be exported.", "A large export is still completed.")
         code, result = self.run_sync("apply", "--draft", self.write_draft(draft["stories"], name="upd.json"))
         self.assertEqual(code, 0, result)
         text = self.read_doc_bytes().decode("utf-8")
@@ -350,7 +350,7 @@ class GenerationTests(ProjectCase):
         code, result = self.apply(stories)
         self.assertEqual(code, 1)  # would be removed
         self.assertEqual(result["conflicts"][0]["reason"], "would_be_removed")
-        add_criterion(stories[0], "Failed logins show a generic error.", "Given a user fails to log in, when the attempt is rejected, then the system shows a generic error.")
+        add_criterion(stories[0], "Failed logins show a generic error.", "A rejected login attempt shows a generic error.")
         code, result = self.run_sync("apply", "--draft", self.write_draft(stories, name="rm.json"), "--allow-remove", "US-002")
         self.assertEqual(code, 0, result)
         self.assertEqual(result["removed"], ["US-002"])
@@ -398,22 +398,70 @@ class ConsolidatedDetailedStoriesTests(ProjectCase):
                          [("US-001", "User Login"), ("US-002", "Password Reset"), ("US-003", "Session Timeout"),
                           ("US-004", "Audit Log"), ("US-005", "Report Export"), ("US-006", "Profile Update")])
 
-    def test_every_story_has_the_same_structure_functional_and_non_functional(self):
+    def test_every_story_has_the_same_field_order_and_empty_optional_fields_are_left_out(self):
         self.generate()
-        labels = ["Description", "Preconditions", "Functional Behaviour", "Business Rules", "Acceptance Criteria",
-                  "Alternate and Error Scenarios", "Non-Functional Requirements", "Dependencies"]
+        order = ["Description", "Preconditions", "Functional Behaviour", "Business Rules", "Acceptance Criteria",
+                 "Alternate and Error Scenarios", "Non-Functional Requirements", "Dependencies"]
+        required = ["Description", "Functional Behaviour", "Acceptance Criteria"]
         blocks = re.split(r"^## US-\d+ — .*$", self.read_detailed(), flags=re.M)[1:]
         self.assertEqual(len(blocks), 6)
         for block in blocks:
-            self.assertEqual(re.findall(r"^\*\*([^*]+):\*\*", block, re.M), labels)
+            labels = re.findall(r"^\*\*([^*]+):\*\*", block, re.M)
+            self.assertEqual(labels, sorted(labels, key=order.index))
+            self.assertTrue(set(required) <= set(labels))
         first = blocks[0]
+        self.assertEqual(re.findall(r"^\*\*([^*]+):\*\*", first, re.M),
+                         ["Description", "Preconditions", "Functional Behaviour", "Business Rules", "Acceptance Criteria",
+                          "Alternate and Error Scenarios", "Non-Functional Requirements"])
         self.assertIn("**Non-Functional Requirements:**\n- Login completes within 2 seconds under normal load.", first)
         self.assertIn("**Preconditions:**\n- The user has a registered account.", first)
-        self.assertIn("**Acceptance Criteria:**\n1. Given a registered user provides valid credentials,", first)
-        self.assertIn("\n2. Given a user provides invalid credentials,", first)
-        self.assertIn("**Preconditions:**\nNot specified.", blocks[1])
+        self.assertIn("**Acceptance Criteria:**\n1. A registered user who submits valid credentials is authenticated.", first)
+        self.assertIn("\n2. A login attempt with invalid credentials is rejected.", first)
+        self.assertEqual(re.findall(r"^\*\*([^*]+):\*\*", blocks[1], re.M), ["Description", "Functional Behaviour", "Acceptance Criteria"])
+        self.assertNotIn("Not specified.", self.read_detailed())
+        self.assertNotIn("Given ", self.read_detailed())
         self.assertNotIn("REQ-", self.read_detailed())
         self.assertNotIn("GAP-", self.read_detailed())
+
+    def test_dependencies_on_other_stories_carry_the_story_id(self):
+        stories = standard_stories()
+        stories[1]["detailed"]["dependencies"] = ["[[User Login]]: the user must be logged in to request a reset.", "The mail service delivers the reset message."]
+        stories[0]["detailed"]["dependencies"] = ["[[Profile Update]]: the profile holds the registered email address."]
+        self.generate(stories)
+        text = self.read_detailed()
+        self.assertIn("**Dependencies:**\n- US-001 (User Login): the user must be logged in to request a reset.\n- The mail service delivers the reset message.", text)
+        self.assertIn("**Dependencies:**\n- US-006 (Profile Update): the profile holds the registered email address.", text)
+        self.assertNotIn("[[", text)
+        page = read_text(self.paths.report)
+        self.assertIn("US-001 (User Login): the user must be logged in to request a reset.", page)
+
+    def test_a_dependency_on_a_new_story_resolves_and_re_applying_changes_nothing(self):
+        self.generate()
+        draft, _ = self.export_draft()
+        extra = make_story("Account Deletion", ["Users can delete their account."], ["REQ-006"],
+                           description="As a user, I want to delete my account so that my data is removed.",
+                           dependencies=["[[Profile Update]]: the profile is the data that is removed.", "[[Account Deletion Audit]]: the deletion is recorded."])
+        audit = make_story("Account Deletion Audit", ["Account deletions are recorded."], ["REQ-004"],
+                           description="As an administrator, I want deletions recorded so that I can review them.")
+        draft["stories"] += [extra, audit]
+        code, result = self.run_sync("apply", "--draft", self.write_draft(draft["stories"], name="dep.json"))
+        self.assertEqual(code, 0, result)
+        self.assertEqual(result["created"], ["US-007", "US-008"])
+        self.assertIn("- US-006 (Profile Update): the profile is the data that is removed.\n- US-008 (Account Deletion Audit): the deletion is recorded.", self.read_detailed())
+        again, _ = self.export_draft()
+        code, result = self.run_sync("apply", "--draft", self.write_draft(again["stories"], name="again.json"))
+        self.assertEqual(code, 0, result)
+        self.assertFalse(result["detailed_file_changed"])
+        self.assertEqual(result["detailed_changed"], [])
+
+    def test_a_file_with_not_specified_fields_from_an_earlier_version_is_still_read(self):
+        legacy = "# Detailed Stories\n\n## US-001 — User Login\n\n**Description:**\nAs a user, I want to log in.\n\n**Preconditions:**\nNot specified.\n\n**Functional Behaviour:**\n- Users log in.\n\n**Acceptance Criteria:**\n1. Valid credentials grant access.\n\n**Dependencies:**\nNot specified.\n"
+        stories, problems = common.parse_detailed_document(legacy)
+        self.assertEqual(problems, [])
+        self.assertEqual((stories[0]["preconditions"], stories[0]["dependencies"]), ([], []))
+        rendered = common.render_detailed(stories[0])
+        self.assertNotIn("Not specified.", rendered)
+        self.assertEqual(common.detailed_hash(common.parse_detailed_document("# Detailed Stories\n\n" + rendered + "\n")[0][0]), common.detailed_hash(stories[0]))
 
     def test_the_detailed_file_round_trips_exactly(self):
         self.generate()
@@ -448,9 +496,9 @@ class ConsolidatedDetailedStoriesTests(ProjectCase):
         story = page.split('id="US-001"')[1].split("</article>")[0]
         self.assertEqual(re.findall(r"<h4>([^<]+)</h4>", story),
                          ["Description", "Preconditions", "Functional Behaviour", "Business Rules", "Acceptance Criteria",
-                          "Alternate and Error Scenarios", "Non-Functional Requirements", "Dependencies"])
+                          "Alternate and Error Scenarios", "Non-Functional Requirements"])
         self.assertIn("Login completes within 2 seconds under normal load.", story)
-        self.assertIn("Given a registered user provides valid credentials", story)
+        self.assertIn("A registered user who submits valid credentials is authenticated.", story)
         self.assertNotIn("Registered users can log in using valid credentials.", story)
         self.assertNotIn("REQ-", story)
         self.assertNotIn("GAP-", story)
@@ -532,7 +580,7 @@ class ConsolidatedDetailedStoriesTests(ProjectCase):
         draft = standard_stories()
         for number, story in enumerate(draft, start=1):
             story["story_id"] = f"US-00{number}"
-        add_criterion(draft[0], "", "Given a locked account, when the user logs in, then access is denied.")
+        add_criterion(draft[0], "", "A locked account is denied access.")
         before = read_binary(self.paths.detailed_file)
         code, result = self.run_sync("apply", "--draft", self.write_draft(draft))
         self.assertEqual(code, 1)
@@ -620,7 +668,7 @@ class ConsolidatedDetailedStoriesTests(ProjectCase):
         self.generate()
         doc, detailed, state = self.read_doc_bytes(), read_binary(self.paths.detailed_file), self.read_state()
         draft, _ = self.export_draft()
-        add_criterion(draft["stories"][0], "Logins are recorded.", "Given a successful login, when it completes, then the system records it.")
+        add_criterion(draft["stories"][0], "Logins are recorded.", "A successful login is recorded.")
         real = common.atomic_write_bytes
 
         def failing(target, payload, prefix=".story-"):
@@ -640,7 +688,7 @@ class ConsolidatedDetailedStoriesTests(ProjectCase):
         self.generate()
         doc, detailed, state = self.read_doc_bytes(), read_binary(self.paths.detailed_file), self.read_state()
         draft, _ = self.export_draft()
-        add_criterion(draft["stories"][0], "Logins are recorded.", "Given a successful login, when it completes, then the system records it.")
+        add_criterion(draft["stories"][0], "Logins are recorded.", "A successful login is recorded.")
         real = common.atomic_write_bytes
 
         def failing(target, payload, prefix=".story-"):
@@ -659,7 +707,7 @@ class ConsolidatedDetailedStoriesTests(ProjectCase):
         self.generate()
         detailed = read_binary(self.paths.detailed_file)
         draft, _ = self.export_draft()
-        add_criterion(draft["stories"][0], "Logins are recorded.", "Given a successful login, when it completes, then the system records it.")
+        add_criterion(draft["stories"][0], "Logins are recorded.", "A successful login is recorded.")
         with mock.patch.object(sync, "verify_written", return_value=["simulated read-back mismatch"]):
             code, result = self.run_sync("apply", "--draft", self.write_draft(draft["stories"], name="v.json"))
         self.assertEqual(code, 1)
@@ -846,10 +894,44 @@ class ValidationTests(ProjectCase):
         self.assertEqual(errors, [])
         self.assertTrue(any("as expected" in w for w in warnings))
 
+    def test_detailed_criteria_written_as_given_when_then_draw_a_warning_only(self):
+        gherkin = "Given valid credentials, when the user logs in, then access is granted."
+        errors, warnings = self.check(lambda d: d["stories"][0]["detailed"]["acceptance_criteria"].append(gherkin))
+        self.assertEqual(errors, [])
+        self.assertTrue(any("detailed criterion 3 is written as Given/When/Then" in w for w in warnings), warnings)
+        errors, warnings = self.check()
+        self.assertEqual((errors, warnings), ([], []))
+
+    def test_a_dependency_on_another_story_must_name_a_story_of_the_draft(self):
+        def depend(text, story=1):
+            return lambda d: d["stories"][story]["detailed"].__setitem__("dependencies", [text])
+        errors, _ = self.check(depend("[[User Login]]: the user must be logged in."))
+        self.assertEqual(errors, [])
+        errors, _ = self.check(depend("[[user   login]]: matching ignores case and spacing."))
+        self.assertEqual(errors, [])
+        errors, _ = self.check(depend("[[Unknown Story]]: needed."))
+        self.assertTrue(any("not the summary of any story in the draft" in e for e in errors), errors)
+        errors, _ = self.check(depend("[[Password Reset]]: needed."))
+        self.assertTrue(any("depend on itself" in e for e in errors), errors)
+        errors, _ = self.check(depend("US-009: needed."))
+        self.assertTrue(any("US-009" in e and "not a story in the draft" in e for e in errors), errors)
+        errors, _ = self.check(lambda d: (d["stories"][0].__setitem__("story_id", "US-001"), d["stories"][1]["detailed"].__setitem__("dependencies", ["US-001: needed."])))
+        self.assertEqual(errors, [])
+
+    def test_the_saved_detailed_file_warns_about_a_dependency_on_a_missing_story(self):
+        self.generate()
+        detailed = common.scan_detailed(self.paths)
+        story = dict(detailed.stories["US-002"], dependencies=["US-001 (User Login): logged in.", "US-077 (Ghost): needed."])
+        _, warnings, _ = validator.validate_story_set(
+            [{"story_id": "US-002", "summary": "Password Reset", "acceptance_criteria": ["Users can reset a password."]}], [],
+            type("D", (), {"problems": [], "exists": True, "stories": {"US-002": story, "US-001": detailed.stories["US-001"]}})(), None, None)
+        self.assertTrue(any("US-077" in w for w in warnings), warnings)
+        self.assertFalse(any("US-001" in w for w in warnings), warnings)
+
     def test_lean_criteria_must_not_be_given_when_then_scenarios(self):
         errors, _ = self.check(lambda d: d["stories"][0].__setitem__("lean_acceptance_criteria", ["Given valid credentials, when the user logs in, then access is granted."]))
         self.assertTrue(any("lean criterion 1 is a Given/When/Then scenario" in e for e in errors), errors)
-        # The detailed criteria are Given/When/Then and that is fine.
+        # The detailed criteria are plain statements.
         errors, _ = self.check()
         self.assertEqual(errors, [])
 
@@ -984,7 +1066,7 @@ class EnrichmentTests(ProjectCase):
     def enrich_us001(self):
         draft, _ = self.export_draft()
         add_criterion(draft["stories"][0], "Accounts are locked for 30 minutes after five consecutive failed login attempts.",
-                      "Given a user has five consecutive failed login attempts, when another login attempt is made, then the system locks the account for 30 minutes.")
+                      "After five consecutive failed login attempts the account is locked for 30 minutes.")
         draft["stories"][0]["detailed"]["business_rules"].append("An account is locked for 30 minutes after five consecutive failed login attempts.")
         draft["stories"][0]["applied_decisions"] = ["GAP-001"]
         draft["decisions_reviewed"] = [{"gap_id": "GAP-001", "outcome": "incorporated"}]
@@ -1006,7 +1088,7 @@ class EnrichmentTests(ProjectCase):
         self.assertEqual(len(result["unchanged"]), 5)
         self.assertIn("Accounts are locked for 30 minutes after five consecutive failed login attempts.", self.section_of())
         self.assertIn("**Acceptance Criteria:** Registered users can log in using valid credentials,", self.section_of())
-        self.assertIn("3. Given a user has five consecutive failed login attempts,", self.read_detailed())
+        self.assertIn("3. After five consecutive failed login attempts the account is locked for 30 minutes.", self.read_detailed())
         code, info = self.run_sync("inspect")
         self.assertEqual(info["pending_decisions"], [])
         self.assertEqual(self.read_state()["decision_ledger"]["GAP-001"]["outcome"], "incorporated")
@@ -1130,7 +1212,7 @@ class ManualEditTests(ProjectCase):
         self.assertTrue(info["manual_changes"]["outside_section_modified"])
         self.assertFalse(info["manual_changes"]["section_modified"])
         draft, ctx = self.export_draft()
-        add_criterion(draft["stories"][5], "Empty names are rejected.", "Given a user saves an empty name, when the profile is saved, then the system rejects it.")
+        add_criterion(draft["stories"][5], "Empty names are rejected.", "A profile saved with an empty name is rejected.")
         code, result = self.run_sync("apply", "--draft", self.write_draft(draft["stories"], name="o.json"))
         self.assertEqual(code, 0, result)
         self.assertIn("Managers export reports in CSV.", self.read_doc_bytes().decode())
@@ -1138,7 +1220,7 @@ class ManualEditTests(ProjectCase):
     def test_manual_edit_conflicts_are_not_overwritten_without_consent(self):
         draft, _ = self.export_draft()
         self.edit_section("Users can update their profile details.", "Users can maintain their profile details.")
-        add_criterion(draft["stories"][5], "Empty names are rejected.", "Given a user saves an empty name, when the profile is saved, then the system rejects it.")
+        add_criterion(draft["stories"][5], "Empty names are rejected.", "A profile saved with an empty name is rejected.")
         path = self.write_draft(draft["stories"], name="c.json")
         before = self.read_doc_bytes()
         code, result = self.run_sync("apply", "--draft", path)
@@ -1155,7 +1237,7 @@ class ManualEditTests(ProjectCase):
         self.edit_section("## US-006 — Profile Update", "## US-006 — Profile Maintenance")
         draft, _ = self.export_draft()
         self.assertEqual(draft["stories"][5]["summary"], "Profile Maintenance")
-        add_criterion(draft["stories"][0], "Sessions are kept unique.", "Given a user logs in twice, when the second login occurs, then the system keeps one session.")
+        add_criterion(draft["stories"][0], "Sessions are kept unique.", "A second login by the same user keeps a single session.")
         code, result = self.run_sync("apply", "--draft", self.write_draft(draft["stories"], name="k.json"))
         self.assertEqual(code, 0, result)
         self.assertEqual(result["updated"], ["US-001", "US-006"])  # the kept summary also reaches US-006's detailed story
@@ -1271,7 +1353,7 @@ class SafetyTests(ProjectCase):
         self.generate()
         before_doc, before_state = self.read_doc_bytes(), self.read_state()
         draft, _ = self.export_draft()
-        add_criterion(draft["stories"][0], "Login times are recorded.", "Given a user logs in, when the login succeeds, then the system records the time.")
+        add_criterion(draft["stories"][0], "Login times are recorded.", "A successful login records the login time.")
         path = self.write_draft(draft["stories"], name="f.json")
         real = common.atomic_write_bytes
 
@@ -1291,7 +1373,7 @@ class SafetyTests(ProjectCase):
         self.generate()
         before = self.read_doc_bytes()
         draft, _ = self.export_draft()
-        add_criterion(draft["stories"][0], "Login times are recorded.", "Given a user logs in, when the login succeeds, then the system records the time.")
+        add_criterion(draft["stories"][0], "Login times are recorded.", "A successful login records the login time.")
         path = self.write_draft(draft["stories"], name="v.json")
         with mock.patch.object(sync, "verify_written", return_value=["simulated read-back mismatch"]):
             code, result = self.run_sync("apply", "--draft", path)
@@ -1303,7 +1385,7 @@ class SafetyTests(ProjectCase):
         self.generate()
         draft, result = self.export_draft()
         sha = result["source_sha256"]
-        add_criterion(draft["stories"][0], "Login times are recorded.", "Given a user logs in, when the login succeeds, then the system records the time.")
+        add_criterion(draft["stories"][0], "Login times are recorded.", "A successful login records the login time.")
         path = self.write_draft(draft["stories"], name="cc.json")
         # Changed between inspect and apply.
         text = self.read_doc_bytes().decode()
@@ -1324,7 +1406,7 @@ class SafetyTests(ProjectCase):
                 handle.write(b"\nsneaky edit\n")
             return backup
 
-        add_criterion(draft["stories"][0], "Logouts end the session.", "Given a user logs out, when the logout completes, then the system ends the session.")
+        add_criterion(draft["stories"][0], "Logouts end the session.", "A completed logout ends the session.")
         detailed = read_binary(self.paths.detailed_file)
         with mock.patch.object(sync, "make_backup", sneaky):
             code, result = self.run_sync("apply", "--draft", self.write_draft(draft["stories"], name="c2.json"), "--expected-source-sha256", sha)
@@ -1361,7 +1443,7 @@ class SafetyTests(ProjectCase):
     def test_state_failure_after_document_write_is_reported(self):
         self.generate()
         draft, _ = self.export_draft()
-        add_criterion(draft["stories"][0], "Login times are recorded.", "Given a user logs in, when the login succeeds, then the system records the time.")
+        add_criterion(draft["stories"][0], "Login times are recorded.", "A successful login records the login time.")
         path = self.write_draft(draft["stories"], name="s.json")
         with mock.patch.object(sync, "save_state", side_effect=common.IOFailure("disk full")):
             code, result = self.run_sync("apply", "--draft", path)
@@ -1436,7 +1518,7 @@ class ReportTests(ProjectCase):
             self.assertIn(f'id="{marker}"', page)
         for story_id in ("US-001", "US-006"):
             self.assertIn(f'id="{story_id}"', page)
-        self.assertIn("Given a registered user provides valid credentials", page)
+        self.assertIn("A registered user who submits valid credentials is authenticated.", page)
         open_section = page.split('id="gaps-open"')[1].split("<section")[0]
         resolved_section = page.split('id="gaps-resolved"')[1].split("<section")[0]
         skipped_section = page.split('id="gaps-skipped"')[1].split("<section")[0]
@@ -1476,7 +1558,7 @@ class ReportTests(ProjectCase):
     def test_08_source_text_is_escaped(self):
         stories = standard_stories()
         stories[0]["summary"] = "Login <img src=x onerror=alert(1)> & more"
-        stories[0]["detailed"]["acceptance_criteria"][0] = "Given <script>alert('x')</script> when 1 < 2 then the system responds in 3 seconds."
+        stories[0]["detailed"]["acceptance_criteria"][0] = "<script>alert('x')</script> when 1 < 2 the system responds in 3 seconds."
         stories[0]["detailed"]["non_functional_requirements"] = ["Responds <b>fast</b> & reliably."]
         self.generate(stories)
         page = self.page()
@@ -1515,7 +1597,7 @@ class ReportTests(ProjectCase):
             return real(target, payload, prefix=prefix)
 
         draft, _ = self.export_draft()
-        add_criterion(draft["stories"][0], "Login times are recorded.", "Given a user logs in, when the login succeeds, then the system records the time.")
+        add_criterion(draft["stories"][0], "Login times are recorded.", "A successful login records the login time.")
         with mock.patch.object(common, "atomic_write_bytes", failing):
             code, result = self.run_sync("apply", "--draft", self.write_draft(draft["stories"], name="rf.json"))
         self.assertEqual(code, 3)
@@ -1528,7 +1610,7 @@ class ReportTests(ProjectCase):
         self.assertEqual(len(self.read_state()["stories"]), len(state["stories"]))
         code, result = self.run_sync("regenerate-report")
         self.assertEqual(code, 0, result)
-        self.assertIn("the system records the time", self.page())
+        self.assertIn("A successful login records the login time.", self.page())
 
     def test_12_report_only_regeneration_changes_nothing_else(self):
         self.generate()
@@ -1587,14 +1669,15 @@ class StandardDocsTests(unittest.TestCase):
 
     def test_the_writing_rules_define_both_representations(self):
         text = read_plugin("rules", "story-writing-rules.md")
-        for expected in ("stories/detailed_stories.md", "Story ID", "typically 3-7 words", "**One** concise statement", "**Given/When/Then**", "Non-Functional Requirements",
+        for expected in ("stories/detailed_stories.md", "Story ID", "typically 3-7 words", "**One** concise statement", "**Given/When/Then**", "Non-Functional Requirements", "Story ID and summary",
                          "Never create a separate Markdown file per story", "## US-001 — Registered user login"):
             self.assertIn(expected, text)
 
     def test_the_criteria_rules_separate_detailed_and_ultra_lean_criteria(self):
         text = read_plugin("rules", "acceptance-criteria-rules.md")
-        self.assertIn("Detailed criteria (Given / When / Then)", text)
+        self.assertIn("Detailed criteria (plain text)", text)
         self.assertIn("Ultra-lean criteria (requirements document)", text)
+        self.assertIn("Do not use Given / When / Then", text)
         self.assertIn("**Not Gherkin.**", text)
 
     def test_the_management_rules_state_the_locations_the_gate_and_the_validation_list(self):

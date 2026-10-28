@@ -254,7 +254,7 @@ Rebuilds `report/phase3-report.html` from `stories/detailed_stories.md`, the gap
 Each story exists in two representations that share one Story ID and one summary.
 
 - The **ultra-lean story** lives in the `# Development Stories` section of your requirements document (always its last section). It contains only the Story ID, a concise summary of 3-7 words (both in the heading) and one short, high-level acceptance-criteria statement of the primary expected functional outcome from the user's perspective. No bullets, no Gherkin, no detailed conditions, alternate flows or edge cases, no implementation notes, no non-functional criteria, and no duplication of the detailed acceptance criteria.
-- The **detailed stories** all live in one file, `stories/detailed_stories.md` (never one file per story). Each is the authoritative, implementation-ready version with the same fields every time: description, preconditions, functional behaviour, business rules, detailed Given/When/Then acceptance criteria, alternate and error scenarios, non-functional requirements and dependencies. Only what the atomic requirements and confirmed decisions support is included; nothing is invented for an unresolved gap, and an empty optional field reads `Not specified.`
+- The **detailed stories** all live in one file, `stories/detailed_stories.md` (never one file per story). Each is the authoritative, implementation-ready version with the same fields in the same order: description, preconditions, functional behaviour, business rules, acceptance criteria, alternate and error scenarios, non-functional requirements and dependencies. The acceptance criteria are plain-text sentences (condition and expected outcome), not Gherkin, so they are easy to read. A dependency on another story always names its Story ID. The file is kept lean: each thing is said once, and an optional field with nothing to say is left out. Only what the atomic requirements and confirmed decisions support is included; nothing is invented for an unresolved gap.
 
 Ultra-lean story in the document:
 
@@ -287,21 +287,24 @@ As a registered user, I want to log in with my registered email address and pass
 - A rejected login does not reveal whether the email address or the password was wrong.
 
 **Acceptance Criteria:**
-1. Given valid credentials, when the user logs in, then access is granted and the authenticated area is shown.
-2. Given an unknown email address, when the user logs in, then access is denied and a generic error message is displayed.
-3. Given a wrong password for a registered email address, when the user logs in, then access is denied and the same generic error message is displayed.
-
-**Alternate and Error Scenarios:**
-- Unknown email address and wrong password produce the same rejection.
+1. Valid credentials grant access and show the authenticated area.
+2. An unknown email address is denied access with a generic error message.
+3. A wrong password for a registered email address is denied access with the same generic error message.
 
 **Non-Functional Requirements:**
 - Login completes within 2 seconds under normal load.
-
-**Dependencies:**
-Not specified.
 ```
 
-(The example is illustrative: real stories contain only what your requirements and recorded decisions state.) The ultra-lean rules are in `rules/story-writing-rules.md` and `rules/acceptance-criteria-rules.md`: a concise 3-7 word summary; one short, high-level statement of the primary functional outcome; detailed conditions, alternate flows, edge cases, exhaustive business rules, implementation notes, technical design and non-functional criteria stay out, and the detailed acceptance criteria are not duplicated. The detailed story keeps every confirmed functional rule, and no behaviour is invented (unresolved behaviour stays a gap). Enrichment changes the detailed story first, merges a decision into an existing item where it fits, and keeps the ID, summary and unrelated criteria. `validate-development-stories.py` rejects Given/When/Then and more than one statement in the lean criteria and prints advisory `WARNING` lines for a summary outside 3-7 words, a long statement or one that looks non-functional; warnings never fail validation.
+A story that depends on another names it with its Story ID, for example `US-002 — Password reset`:
+
+```markdown
+**Dependencies:**
+- US-001 (Registered user login): the user must be logged in before a reset can be requested.
+```
+
+In the draft the other story is written `[[Registered user login]]`; the sync script replaces it with its ID, so a new story can be referenced before it has one.
+
+(The example is illustrative: real stories contain only what your requirements and recorded decisions state.) The ultra-lean rules are in `rules/story-writing-rules.md` and `rules/acceptance-criteria-rules.md`: a concise 3-7 word summary; one short, high-level statement of the primary functional outcome; detailed conditions, alternate flows, edge cases, exhaustive business rules, implementation notes, technical design and non-functional criteria stay out, and the detailed acceptance criteria are not duplicated. The detailed story keeps every confirmed functional rule, and no behaviour is invented (unresolved behaviour stays a gap). Enrichment changes the detailed story first, merges a decision into an existing item where it fits, and keeps the ID, summary and unrelated criteria. `validate-development-stories.py` rejects Given/When/Then and more than one statement in the lean criteria, rejects a dependency that names a story that does not exist (or the story itself), and prints advisory `WARNING` lines for a summary outside 3-7 words, a long lean statement or one that looks non-functional, and detailed criteria written as Given/When/Then; warnings never fail validation.
 
 No requirement IDs, gap IDs, priorities, statuses or decisions appear in either version of a story. Those mappings live in `stories/story-generation-state.json`; gaps and decisions are in the report. Story IDs (`US-001`, ...) are unique, sorted numerically, kept when a story is updated, and never reused after a story is removed.
 

@@ -78,7 +78,7 @@ Invoke `ba-requirements:story-generation-agent` with: the plugin root, mode `enr
 python ${CLAUDE_PLUGIN_ROOT}/scripts/validate-development-stories.py <temp>/draft.json --project-root <project root>
 ```
 
-Read the draft against the export. Check: only stories affected by a decision changed; IDs unchanged; unrelated criteria and the summary untouched; no duplicate criteria (a decision is merged into an existing criterion where it fits); the detailed story carries the full decision (rule, behaviour, criterion, scenario or non-functional target, as fits) and the ultra-lean story agrees with it and stays one short, high-level functional statement (no bullets, no Given/When/Then, no detailed conditions, no non-functional criteria); every pending decision appears in `decisions_reviewed` with an honest outcome; no open or skipped gap used as a decision; the decision text is reflected accurately, with the user's values.
+Read the draft against the export. Check: only stories affected by a decision changed; IDs unchanged; unrelated criteria and the summary untouched; no duplicate criteria (a decision is merged into an existing criterion where it fits); the detailed story carries the full decision (rule, behaviour, plain-text criterion or non-functional target, as fits) and the ultra-lean story agrees with it and stays one short, high-level functional statement (no bullets, no Given/When/Then, no detailed conditions, no non-functional criteria); every pending decision appears in `decisions_reviewed` with an honest outcome; no open or skipped gap used as a decision; the decision text is reflected accurately, with the user's values.
 
 ## Step 8 — Preview, then write
 

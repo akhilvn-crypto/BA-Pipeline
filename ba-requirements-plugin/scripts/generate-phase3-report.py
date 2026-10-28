@@ -167,18 +167,17 @@ def story_text(story):
 
 
 def render_story(story, pair):
-    """A detailed story: every field, functional and non-functional, in the same order as stories/detailed_stories.md."""
+    """A detailed story: its fields, functional and non-functional, in the same order as stories/detailed_stories.md (an empty optional field is left out there and here)."""
     sections = [f'<h4>Description</h4>{paragraphs(story["description"])}']
     for key, label, kind, _ in common.DETAILED_FIELDS:
         if kind == "text":
             continue
         items = story[key]
-        css = ' class="nfr"' if key == "non_functional_requirements" else ""
         if not items:
-            body = f'<p class="muted">{esc(common.NOT_SPECIFIED)}</p>'
-        else:
-            tag = "ol" if kind == "numbered" else "ul"
-            body = f"<{tag}>" + "".join(f"<li>{esc(item)}</li>" for item in items) + f"</{tag}>"
+            continue
+        css = ' class="nfr"' if key == "non_functional_requirements" else ""
+        tag = "ol" if kind == "numbered" else "ul"
+        body = f"<{tag}>" + "".join(f"<li>{esc(item)}</li>" for item in items) + f"</{tag}>"
         sections.append(f"<div{css}><h4>{esc(label)}</h4>{body}</div>")
     return (
         f'<article class="story" id="{esc(story["story_id"])}" data-search="{esc(story_text(story))}">'

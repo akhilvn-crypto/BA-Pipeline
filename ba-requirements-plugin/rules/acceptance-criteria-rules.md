@@ -1,6 +1,6 @@
 # Acceptance Criteria Rules
 
-Acceptance criteria define observable outcomes that can be validated independently. Every story has two sets: the **detailed** criteria in `stories/detailed_stories.md` (complete, testable, authoritative) and a single **ultra-lean** statement derived from them for the requirements document. The quality bar applies to both; the form differs.
+Acceptance criteria define observable outcomes that can be validated independently. Every story has two sets: the **detailed** criteria in `stories/detailed_stories.md` (complete, testable, authoritative, in plain text) and a single **ultra-lean** statement derived from them for the requirements document. The quality bar applies to both; the form differs.
 
 ## Quality bar
 
@@ -11,15 +11,16 @@ Every criterion is:
 3. **Relevant** to its own story, **consistent** with the source requirements and with confirmed decisions, and **non-duplicative** (no two criteria in a story say the same thing).
 4. **Supported.** It follows from a requirement or a resolved gap's latest decision. Do not invent behaviour to make a story look comprehensive.
 
-## Detailed criteria (Given / When / Then)
+## Detailed criteria (plain text)
 
-1. The detailed story carries all the criteria the behaviour needs. There is no upper limit: one criterion per business rule, validation, alternate flow, exception flow, boundary and security condition that the requirements or a confirmed decision state.
-2. Each criterion is independently testable with a clear expected outcome, in Given / When / Then wording: *Given* the starting condition, *when* the action or event, *then* the observable outcome. One behaviour per criterion.
-3. Use a direct declarative statement only for a standing rule or constraint that has no trigger ("The system must not expose passwords in URLs, logs or error messages.").
-4. Include a precondition as the *Given* of the criteria it affects. Do not hide it in the description alone.
-5. Use the exact values from the requirements or the confirmed decision.
-6. Non-functional requirements with a measurable target are testable too. State them in the story's Non-Functional Requirements field with the target, and add a criterion when the target can be checked in the same way as other behaviour.
-7. Write each criterion as plain text. No numbering, bullets or Markdown headings; numbering is added when the story is written.
+1. The detailed story carries all the criteria the behaviour needs. There is no upper limit: one criterion per business rule, validation, alternate flow, exception flow, boundary and security condition that the requirements or a confirmed decision state. Alternate and error behaviour is written here, as a criterion, and not repeated in another field.
+2. Write each criterion as one plain sentence that a business reader and a tester understand the same way: the condition (when there is one) and the observable outcome. Example: "An unknown email address is rejected with a generic error message." Do not use Given / When / Then, step lists or scenario labels.
+3. Each criterion is independently testable with a clear expected outcome and covers one behaviour.
+4. A standing rule or constraint with no trigger is just as plain ("The system must not expose passwords in URLs, logs or error messages.").
+5. State a precondition inside the criteria it affects. Do not hide it in the description alone.
+6. Use the exact values from the requirements or the confirmed decision.
+7. Non-functional requirements with a measurable target are testable too. State them in the story's Non-Functional Requirements field with the target, and add a criterion when the target can be checked in the same way as other behaviour.
+8. Write each criterion as plain text. No numbering, bullets or Markdown headings; numbering is added when the story is written.
 
 ## Ultra-lean criteria (requirements document)
 

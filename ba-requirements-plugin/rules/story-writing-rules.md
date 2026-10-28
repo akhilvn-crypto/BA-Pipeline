@@ -39,7 +39,7 @@ Rules:
 
 ## The detailed story (`stories/detailed_stories.md`)
 
-The file holds one section per story, in Story ID order. Every story has the same fields, in this order, and every field is always present (an empty optional field reads `Not specified.`):
+The file holds one section per story, in Story ID order. Every story has the same fields, in this order. The required fields are always present; an optional field with nothing to say is left out of the story (no `Not specified.` lines):
 
 | Field | Content | Required |
 |---|---|---|
@@ -48,10 +48,10 @@ The file holds one section per story, in Story ID order. Every story has the sam
 | Preconditions | What must be true before the story applies | no |
 | Functional Behaviour | The detailed behaviour the system must provide | yes |
 | Business Rules | Rules, limits and constraints with their exact values | no |
-| Acceptance Criteria | Complete, independently testable Given/When/Then criteria (see `acceptance-criteria-rules.md`) | yes |
-| Alternate and Error Scenarios | Relevant alternate and error flows | no |
+| Acceptance Criteria | Complete, independently testable criteria in plain text, not Given/When/Then (see `acceptance-criteria-rules.md`) | yes |
+| Alternate and Error Scenarios | Alternate or error flow notes that no acceptance criterion already states (normally none) | no |
 | Non-Functional Requirements | Applicable quality attributes with measurable targets | no |
-| Dependencies | Other stories, systems, data or decisions the story depends on | no |
+| Dependencies | Other stories (always with their Story ID), systems, data, roles or decisions the story depends on | no |
 
 Rules:
 
@@ -60,6 +60,21 @@ Rules:
 3. A purely technical or system requirement that no functional story carries becomes a system story ("As the system, I must ..."). Its ultra-lean criteria state only the observable outcome of the capability; the measurable quality targets stay in its detailed Non-Functional Requirements.
 4. Do not copy requirement IDs, gap IDs or decision metadata into the story text. Say what the rule is, not where it came from.
 5. Preserve conditions, limits and values exactly as the requirements and decisions state them.
+
+### Dependencies
+
+1. A dependency on another story names that story by **Story ID and summary**, then says what is needed from it ("US-001 (Registered user login): the user must be logged in before a reset can be requested").
+2. In the draft, write the other story as `[[Exact summary of that story]]`. The sync script replaces it with `US-001 (Registered user login)` once every story has its ID, so a new story can be referenced before it has one. An existing story in the draft may also be written by its ID. The validator rejects a reference to a story that is not in the draft and a story that depends on itself.
+3. List a dependency once, on the story that needs the other (the dependent), not on both.
+4. Systems, data, roles and decisions are named in plain text. A decision is described by what was decided, never by a gap ID.
+5. Only list a dependency the requirements or a confirmed decision support.
+
+### Keeping the detailed story lean
+
+1. Say each thing once, in the field it belongs to: what the system does in Functional Behaviour, rules and limits in Business Rules, how it is verified (including alternate and error behaviour) in Acceptance Criteria. Do not restate a rule in every field.
+2. One short, plain sentence per item. No background narrative, filler or repeated wording.
+3. Leave an optional field out when the requirements say nothing for it. Alternate and Error Scenarios is for flow notes no criterion already states.
+4. Leaner never means less: every confirmed rule, value, limit, exception, security condition and non-functional target stays in the story.
 
 The draft format that carries both representations is in `schemas/development-stories.schema.json` and `skills/story-generation/SKILL.md`. Supply plain text only: no numbering, no bullets, no headings and no `**Label:**` lines inside a field.
 

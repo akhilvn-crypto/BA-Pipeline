@@ -671,12 +671,27 @@ def cmd_apply(paths, args):
         if not (lean_deleted or detailed_deleted):
             raise Refused(f"{story_id} cannot be restored: neither its story in the document nor its detailed story was deleted by hand.")
 
+    # New stories get the next unused IDs in draft order. They are known before the plan is made so that a
+    # dependency written as [[Summary of another story]] can already name that story by its ID.
+    numbers = [common.story_number(s) for s in list(doc_by_id) + list(baseline) + list(retired) + list(detailed_now)]
+    highest = max([int((state or {}).get("highest_story_number", 0))] + numbers)
+    new_ids = {}
+    for index, item in enumerate(draft["stories"]):
+        if item.get("story_id") is None:
+            highest += 1
+            new_ids[index] = common.format_story_id(highest)
+    ids_by_summary = {
+        common.story_reference_key(item["summary"]): (item.get("story_id") or new_ids[index], common.collapse(item["summary"]))
+        for index, item in enumerate(draft["stories"])
+    }
+
     plan, conflicts = [], []
     pair = common.pair_status(doc.stories, detailed_now, state)
-    for item in draft["stories"]:
+    for index, item in enumerate(draft["stories"]):
         story_id = item.get("story_id")
         lean, full = common.lean_view(item), common.detailed_view(item)
-        entry = {"draft": item, "lean": lean, "full": full, "story_id": story_id, "status": "created", "dstatus": "created", "raw": None, "draw": None}
+        full["dependencies"] = common.resolve_story_references(full["dependencies"], ids_by_summary)
+        entry = {"draft": item, "lean": lean, "full": full, "index": index, "story_id": story_id, "status": "created", "dstatus": "created", "raw": None, "draw": None}
         if story_id is not None:
             if story_id in retired:
                 raise Refused(f"{story_id} belongs to a deleted, retired or superseded story. IDs are never reused; use story_id null for a new story.")
@@ -746,12 +761,9 @@ def cmd_apply(paths, args):
         )
     manually_deleted = sorted((s for s in baseline if s not in doc_by_id and s not in draft_ids), key=common.story_number)
 
-    numbers = [common.story_number(s) for s in list(doc_by_id) + list(baseline) + list(retired) + list(detailed_now)]
-    highest = max([int((state or {}).get("highest_story_number", 0))] + numbers)
     for entry in plan:
         if entry["story_id"] is None:
-            highest += 1
-            entry["story_id"] = common.format_story_id(highest)
+            entry["story_id"] = new_ids[entry["index"]]
     plan.sort(key=lambda e: common.story_number(e["story_id"]))
 
     # Traceability and decision bookkeeping.

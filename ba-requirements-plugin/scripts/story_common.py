@@ -628,21 +628,39 @@ def render_section(blocks):
 
 
 def render_detailed(story):
-    """A story of stories/detailed_stories.md. Every field is always present so each story has the same structure."""
+    """A story of stories/detailed_stories.md. The required fields are always present; an optional field with nothing to say is left out."""
     c = canonical_detailed(story)
     out = [story_heading(story["story_id"], c["summary"]), ""]
-    for key, label, kind, _ in DETAILED_FIELDS:
+    for key, label, kind, required in DETAILED_FIELDS:
+        if not required and not c[key]:
+            continue
         out.append(f"**{label}:**")
         if kind == "text":
             out.append(c[key])
-        elif not c[key]:
-            out.append(NOT_SPECIFIED)
         elif kind == "numbered":
             out += [f"{number}. {item}" for number, item in enumerate(c[key], start=1)]
         else:
             out += [f"- {item}" for item in c[key]]
         out.append("")
     return "\n".join(out[:-1])
+
+
+# A dependency on another story is written in a draft as [[Summary of that story]]; it is replaced by the
+# story's ID once every story of the draft has one (a new story is only given its ID when the draft is applied).
+STORY_REF_RE = re.compile(r"\[\[([^\[\]\n]+)\]\]")
+STORY_ID_IN_TEXT_RE = re.compile(r"\bUS-[0-9]{3,}\b")
+
+
+def story_reference_key(summary):
+    return collapse(summary).casefold()
+
+
+def resolve_story_references(items, ids_by_summary):
+    """Replace every [[Summary]] in the items by 'US-001 (Summary)'. A reference that matches no story is left as it is."""
+    def replace(match):
+        found = ids_by_summary.get(story_reference_key(match.group(1)))
+        return f"{found[0]} ({found[1]})" if found else match.group(0)
+    return [STORY_REF_RE.sub(replace, item) for item in items]
 
 
 def render_detailed_document(blocks):

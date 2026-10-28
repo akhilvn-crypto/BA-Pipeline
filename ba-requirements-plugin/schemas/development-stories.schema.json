@@ -34,7 +34,7 @@
             }
           },
           "detailed": {
-            "description": "The DETAILED story written into stories/detailed_stories.md, with every field below always rendered so all stories have the same structure.",
+            "description": "The DETAILED story written into stories/detailed_stories.md. The required fields are always rendered; an empty optional field is left out so the file stays lean.",
             "type": "object",
             "properties": {
               "description": {
@@ -57,12 +57,12 @@
                 "$ref": "#/$defs/textList"
               },
               "acceptance_criteria": {
-                "description": "Complete, independently testable Given/When/Then criteria covering every supported rule, validation, boundary and security condition. Plain text without numbering; numbering is added when the story is written.",
+                "description": "Complete, independently testable acceptance criteria in plain text (one sentence of condition and expected outcome each, not Given/When/Then) covering every supported rule, validation, alternate and error flow, boundary and security condition. Without numbering; numbering is added when the story is written.",
                 "$ref": "#/$defs/textList",
                 "minItems": 1
               },
               "scenarios": {
-                "description": "Relevant alternate and error scenarios. Empty when none are supported.",
+                "description": "Alternate or error flow notes that no acceptance criterion already states. Normally empty; an empty optional field is left out of the detailed stories file.",
                 "$ref": "#/$defs/textList"
               },
               "non_functional_requirements": {
@@ -70,7 +70,7 @@
                 "$ref": "#/$defs/textList"
               },
               "dependencies": {
-                "description": "Other stories, systems, data or decisions this story depends on. Empty when none are known.",
+                "description": "What this story depends on: other stories, systems, data, roles or decisions. A dependency on another story is written '[[Exact summary of that story]]: what is needed' and is saved with that story's Story ID ('US-001 (Summary): ...'); an existing story may be named by its ID. Empty when none are known.",
                 "$ref": "#/$defs/textList"
               }
             },

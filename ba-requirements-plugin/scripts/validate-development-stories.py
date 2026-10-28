@@ -21,7 +21,7 @@ A schema-valid story is not automatically a good story: semantic review (coheren
 testable criteria, no invented decisions) is the agent's job and is specified in rules/ and
 skills/. This script prints a few lint warnings (vague wording, a summary that is not short, a
 long or non-functional-looking lean criterion); warnings never fail validation. One lean rule is
-enforced: lean criteria are plain functional bullets, not Given/When/Then scenarios.
+enforced: lean criteria are one plain functional statement, not Given/When/Then scenarios. Detailed criteria are plain statements too (a Given/When/Then wording only draws a warning).
 
 Exit status: 0 = valid, 1 = validation failed, 2 = a file could not be read.
 """
@@ -153,6 +153,34 @@ def _roundtrip_detailed_error(story):
     if common.canonical_detailed(stories[0]) != common.canonical_detailed(probe):
         return "the text does not survive being written as Markdown and read back"
     return None
+
+
+def _dependency_story_errors(stories):
+    """A dependency names another story as [[Summary of that story]] (or by an existing ID); both must exist in the draft."""
+    usable = [s for s in stories if isinstance(s, dict) and isinstance(s.get("summary"), str) and isinstance(s.get("detailed"), dict)]
+    by_summary = {common.story_reference_key(s["summary"]): s for s in usable}
+    known_ids = {s["story_id"] for s in usable if isinstance(s.get("story_id"), str)}
+    errors = []
+    for position, story in enumerate(stories, start=1):
+        if story not in usable or not isinstance(story["detailed"].get("dependencies"), list):
+            continue
+        label = f"Story {position}" + (f" ({story['story_id']})" if isinstance(story.get("story_id"), str) else "")
+        own = common.story_reference_key(story["summary"])
+        for number, item in enumerate(story["detailed"]["dependencies"], start=1):
+            if not isinstance(item, str):
+                continue
+            for name in common.STORY_REF_RE.findall(item):
+                key = common.story_reference_key(name)
+                if key == own:
+                    errors.append(f"{label}: dependencies item {number} makes the story depend on itself.")
+                elif key not in by_summary:
+                    errors.append(f"{label}: dependencies item {number} refers to [[{name}]], which is not the summary of any story in the draft; copy the exact summary of the story it depends on.")
+            for story_id in common.STORY_ID_IN_TEXT_RE.findall(item):
+                if story_id not in known_ids:
+                    errors.append(f"{label}: dependencies item {number} names {story_id}, which is not a story in the draft; write [[Summary of the story]] for a new story.")
+                elif story_id == story.get("story_id"):
+                    errors.append(f"{label}: dependencies item {number} makes the story depend on itself.")
+    return errors
 
 
 def validate_draft(draft, requirements, register):
@@ -312,6 +340,10 @@ def validate_draft(draft, requirements, register):
         if not re.search(r"\bas an?\b", canon_detail["description"], re.IGNORECASE):
             warnings.append(f"{label}: the detailed description does not use the 'As a ..., I want ..., so that ...' form; use a neutral formulation only when the actor or value is unclear.")
         warnings.extend(lean_warnings(label, canon_lean["summary"], canon_lean["acceptance_criteria"]))
+        for number in gherkin_criteria(canon_detail["acceptance_criteria"]):
+            warnings.append(f"{label}: detailed criterion {number} is written as Given/When/Then; write it as a plain statement of the condition and the expected outcome.")
+
+    errors.extend(_dependency_story_errors(stories))
 
     not_covered = draft.get("not_covered_requirements", [])
     listed = set()
@@ -433,6 +465,12 @@ def validate_story_set(doc_stories, doc_problems, detailed, requirements, state=
         text = " ".join([full["summary"], full["description"]] + full["functional_behaviour"] + full["business_rules"]
                         + full["acceptance_criteria"] + full["scenarios"] + full["non_functional_requirements"]).lower()
         warnings.extend(f"{story_id}: the detailed story contains the vague phrase '{phrase}'." for phrase in VAGUE_PHRASES if phrase in text)
+        for number in gherkin_criteria(full["acceptance_criteria"]):
+            warnings.append(f"{story_id}: detailed criterion {number} is written as Given/When/Then; write it as a plain statement of the condition and the expected outcome.")
+        for dependency in full["dependencies"]:
+            for other in common.STORY_ID_IN_TEXT_RE.findall(dependency):
+                if other not in detailed.stories:
+                    warnings.append(f"{story_id}: a dependency names {other}, which is not in {common.DETAILED_RELATIVE}.")
     for story_id in status["lean_edited"]:
         warnings.append(f"{story_id}: the story in the requirements document was edited since the last synchronisation.")
     for story_id in status["detailed_edited"]:
