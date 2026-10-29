@@ -76,6 +76,7 @@ Rules:
 2. One short, plain sentence per item. No background narrative, filler or repeated wording.
 3. Leave an optional field out when the requirements say nothing for it. Alternate and Error Scenarios is for flow notes no criterion already states.
 4. Leaner never means less: every confirmed rule, value, limit, exception, security condition and non-functional target stays in the story.
+5. **Length target:** 150-250 words per detailed story, preferably within 300. Reach it by removing repetition, unnecessary explanation and duplicated information, never by omitting, oversimplifying or inventing requirements. Exceed 300 words only when needed for completeness, clarity and testability. **Completeness takes priority over brevity.**
 
 The draft format that carries both representations is in `schemas/development-stories.schema.json` and `skills/story-generation/SKILL.md`. Supply plain text only: no numbering, no bullets, no headings and no `**Label:**` lines inside a field.
 
