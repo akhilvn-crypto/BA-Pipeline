@@ -292,8 +292,13 @@ As a registered user, I want to log in with my registered email address and pass
 3. A wrong password for a registered email address is denied access with the same generic error message.
 
 **Non-Functional Requirements:**
+- Security (baseline): Passwords are never exposed in URLs, logs or error messages.
+- Security (baseline): A failed authentication gives a generic error that does not reveal which value was wrong.
+- Security (baseline): Failed and successful authentication attempts are recorded in the audit log.
 - Login completes within 2 seconds under normal load.
 ```
+
+**Security is always derived.** Whether or not your requirements mention security, every new detailed story gets the baseline security controls its behaviour calls for (authentication, authorisation, input validation, sensitive data, sessions and tokens, audit logging, error disclosure, external calls), written into its Non-Functional Requirements with the prefix `Security (baseline): ` so you can tell them from security rules you stated yourself. Baseline entries never contain numbers or other invented values; the mapping from behaviour to controls is in `rules/security-baseline-rules.md`. They appear only in `stories/detailed_stories.md`, never in the requirements document. A security decision that needs a business value (lock-out limit, session timeout, password rules, reset-link validity, audit retention) is still raised as a gap in Phase 2, rated at least High, and applied to the story once you decide it. Other quality attributes (performance, availability, accessibility and so on) are included only when your requirements state them. `validate-development-stories.py` prints a `WARNING` for a new story without a baseline entry and for a baseline entry that contains a number.
 
 A story that depends on another names it with its Story ID, for example `US-002 — Password reset`:
 
